@@ -308,21 +308,14 @@ impl Builder {
         self.voxels.push((x, y, z, tile));
     }
 
-    /// Fills an inclusive box.
-    fn box_fill(&mut self, x0: u8, y0: u8, z0: u8, x1: u8, y1: u8, z1: u8, tile: &'static str) {
-        for y in y0..=y1 {
-            for z in z0..=z1 {
-                for x in x0..=x1 {
-                    self.set(x, y, z, tile);
-                }
-            }
-        }
-    }
-
     /// Fills the whole footprint at one height: a ceiling or a roof.
     fn slab(&mut self, y: u8, tile: &'static str) {
         let (sx, sz) = (self.size[0], self.size[2]);
-        self.box_fill(0, y, 0, sx.saturating_sub(1), y, sz.saturating_sub(1), tile);
+        for z in 0..sz {
+            for x in 0..sx {
+                self.set(x, y, z, tile);
+            }
+        }
     }
 
     /// Fills the whole footprint at one height: an open ground plane.

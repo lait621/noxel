@@ -6,7 +6,6 @@
 
 use std::path::PathBuf;
 
-use noxel_physics::PhysicsConfig;
 use noxel_render::renderer::ShadingMode;
 use noxel_world::WorldConfig;
 
@@ -33,6 +32,8 @@ pub struct Args {
     pub help: bool,
     /// Print the seed and the world's statistics and exit.
     pub world_info: bool,
+    /// Draw the full engine statistics panel over the frame.
+    pub debug: bool,
 }
 
 impl Default for Args {
@@ -48,6 +49,7 @@ impl Default for Args {
             stats_only: false,
             help: false,
             world_info: false,
+            debug: false,
         }
     }
 }
@@ -70,6 +72,7 @@ impl Args {
                 "--quiet" | "-q" => args.quiet = true,
                 "--stats" => args.stats_only = true,
                 "--world-info" => args.world_info = true,
+                "--debug" => args.debug = true,
                 "--no-dump" => args.dump = None,
                 "--seed" => {
                     let value = iter.next().ok_or("--seed needs a number")?;
@@ -112,12 +115,6 @@ impl Args {
         }
     }
 
-    /// The physics configuration the demo uses.
-    #[must_use]
-    pub fn physics_config(&self) -> PhysicsConfig {
-        PhysicsConfig::default()
-    }
-
     /// The help text.
     #[must_use]
     pub fn help() -> String {
@@ -137,6 +134,7 @@ OPTIONS:
     --no-dump         Render without writing anything
     --stats           Render one frame, print its statistics, exit
     --world-info      Print the world's shape for this seed, exit
+    --debug           Draw the engine statistics panel over the frame
     --quiet           Suppress everything but the summary
     -h, --help        Print this text
 
@@ -218,8 +216,12 @@ mod tests {
 
     #[test]
     fn parses_boolean_flags() {
-        let args = Args::parse(["-q", "--stats", "--world-info", "-h"]).unwrap();
-        assert!(args.quiet && args.stats_only && args.world_info && args.help);
+        let args = Args::parse(["-q", "--stats", "--world-info", "-h", "--debug"]).unwrap();
+        assert!(args.quiet && args.stats_only && args.world_info && args.help && args.debug);
+        assert!(
+            !Args::default().debug,
+            "the statistics panel is off by default"
+        );
     }
 
     #[test]

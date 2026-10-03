@@ -1,0 +1,248 @@
+{
+  "name": "town-demo",
+  "schema": 1,
+  "seed": 336338634060,
+  "tile_size": 1,
+  "bounds": {
+    "tiles_x": 192,
+    "tiles_z": 192
+  },
+  "player_start": [
+    96,
+    0,
+    110
+  ],
+  "biomes": [
+    {
+      "name": "meadow",
+      "ground": "grass",
+      "accent": "grass_flowers",
+      "weight": 0.3400000035762787,
+      "moisture": [
+        0.30000001192092896,
+        0.75
+      ]
+    },
+    {
+      "name": "woodland",
+      "ground": "grass_dark",
+      "accent": "dirt",
+      "weight": 0.25999999046325684,
+      "moisture": [
+        0.550000011920929,
+        1
+      ]
+    },
+    {
+      "name": "riverbank",
+      "ground": "sand",
+      "accent": "road_edge",
+      "weight": 0.1599999964237213,
+      "moisture": [
+        0.75,
+        1
+      ]
+    },
+    {
+      "name": "marsh",
+      "ground": "dirt_dark",
+      "accent": "water_shallow",
+      "weight": 0.14000000059604645,
+      "moisture": [
+        0.800000011920929,
+        1
+      ]
+    },
+    {
+      "name": "highland",
+      "ground": "rock",
+      "accent": "snow",
+      "weight": 0.10000000149011612,
+      "moisture": [
+        0,
+        0.3499999940395355
+      ]
+    }
+  ],
+  "towns": [
+    {
+      "name": "Rivermouth",
+      "position": [
+        96,
+        0,
+        96
+      ],
+      "radius": 26,
+      "style": "plaster",
+      "prefabs": [
+        "house_small",
+        "house_large",
+        "shop",
+        "inn",
+        "well",
+        "market_stall",
+        "lamp",
+        "fence_segment"
+      ]
+    },
+    {
+      "name": "Ashford",
+      "position": [
+        44,
+        0,
+        60
+      ],
+      "radius": 12,
+      "style": "wood",
+      "prefabs": [
+        "house_small",
+        "barn",
+        "well",
+        "fence_segment",
+        "tree_oak"
+      ]
+    },
+    {
+      "name": "Bram Hollow",
+      "position": [
+        150,
+        0,
+        132
+      ],
+      "radius": 10,
+      "style": "stone",
+      "prefabs": [
+        "house_small",
+        "barn",
+        "well",
+        "tree_pine"
+      ]
+    }
+  ],
+  "roads": [
+    {
+      "name": "high street",
+      "tile": "road",
+      "points": [
+        [
+          66,
+          0,
+          96
+        ],
+        [
+          96,
+          0,
+          94
+        ],
+        [
+          126,
+          0,
+          100
+        ]
+      ]
+    },
+    {
+      "name": "north road",
+      "tile": "road",
+      "points": [
+        [
+          93,
+          0,
+          8
+        ],
+        [
+          94,
+          0,
+          90
+        ],
+        [
+          97,
+          0,
+          136
+        ]
+      ]
+    }
+  ],
+  "pois": [
+    {
+      "name": "The Old Well",
+      "kind": "well",
+      "prefab": "well",
+      "position": [
+        89.26978302001953,
+        0,
+        91.97244262695313
+      ]
+    },
+    {
+      "name": "Rivermouth Market",
+      "kind": "market",
+      "prefab": "market_stall",
+      "position": [
+        101.64632415771484,
+        0,
+        93.42157745361328
+      ]
+    },
+    {
+      "name": "The Gilded Goose",
+      "kind": "inn",
+      "prefab": "inn",
+      "position": [
+        84.1060562133789,
+        0,
+        102.40415954589844
+      ]
+    },
+    {
+      "name": "Blacksmith's Forge",
+      "kind": "smithy",
+      "prefab": "shop",
+      "position": [
+        105.91007995605469,
+        0,
+        104.36084747314453
+      ]
+    },
+    {
+      "name": "Chapel of the Dawn",
+      "kind": "chapel",
+      "prefab": "house_large",
+      "position": [
+        96.55300903320313,
+        0,
+        110.7767333984375
+      ]
+    },
+    {
+      "name": "North Gate",
+      "kind": "gate",
+      "prefab": "fence_segment",
+      "position": [
+        93.83326721191406,
+        0,
+        76.88255310058594
+      ]
+    },
+    {
+      "name": "Miller's Barn",
+      "kind": "farm",
+      "prefab": "barn",
+      "position": [
+        113.97877502441406,
+        0,
+        106.74783325195313
+      ]
+    },
+    {
+      "name": "The Standing Stones",
+      "kind": "ruin",
+      "prefab": "rock_cluster",
+      "position": [
+        78.23623657226563,
+        0,
+        84.25118255615234
+      ]
+    }
+  ]
+}

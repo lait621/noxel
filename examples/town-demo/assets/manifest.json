@@ -1,0 +1,126 @@
+{
+  "name": "town-demo",
+  "version": "1",
+  "tile_sets": [
+    "tilesets/terrain.json",
+    "tilesets/buildings.json"
+  ],
+  "prefabs": [
+    "prefabs/house_small.json",
+    "prefabs/house_large.json",
+    "prefabs/shop.json",
+    "prefabs/inn.json",
+    "prefabs/barn.json",
+    "prefabs/well.json",
+    "prefabs/fence_segment.json",
+    "prefabs/tree_pine.json",
+    "prefabs/tree_oak.json",
+    "prefabs/rock_cluster.json",
+    "prefabs/lamp.json",
+    "prefabs/market_stall.json"
+  ],
+  "palettes": [
+    "config/palette.json"
+  ],
+  "sprites": [
+    "sprites/characters.json"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "kind": "doc"
+    },
+    {
+      "path": "config/palette.json",
+      "kind": "palette"
+    },
+    {
+      "path": "manifest.json",
+      "kind": "manifest"
+    },
+    {
+      "path": "prefabs/barn.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/fence_segment.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/house_large.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/house_small.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/inn.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/lamp.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/market_stall.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/rock_cluster.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/shop.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/tree_oak.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/tree_pine.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "prefabs/well.json",
+      "kind": "prefab"
+    },
+    {
+      "path": "sprites/characters.json",
+      "kind": "sprite"
+    },
+    {
+      "path": "textures/buildings.png",
+      "kind": "texture"
+    },
+    {
+      "path": "textures/characters.png",
+      "kind": "texture"
+    },
+    {
+      "path": "textures/props.png",
+      "kind": "texture"
+    },
+    {
+      "path": "textures/terrain.png",
+      "kind": "texture"
+    },
+    {
+      "path": "tilesets/buildings.json",
+      "kind": "tileset"
+    },
+    {
+      "path": "tilesets/terrain.json",
+      "kind": "tileset"
+    },
+    {
+      "path": "world/README.md",
+      "kind": "doc"
+    },
+    {
+      "path": "world/demo.json",
+      "kind": "world"
+    }
+  ]
+}

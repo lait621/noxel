@@ -29,6 +29,13 @@ use noxel_core::math::{Aabb, ChunkPos, Vec3};
 use crate::chunk::{Chunk, PropInstance};
 use crate::r#gen::{GenStats, WorldGenerator};
 
+/// Furthest chunk a streaming focus is honoured at.
+///
+/// Around 32 million metres: far past any streamable world, and small enough
+/// that a focus of `f32::MAX` still lands on a valid chunk instead of
+/// overflowing the radius arithmetic.
+pub const MAX_FOCUS_CHUNK: i32 = 1_000_000;
+
 /// What a streaming update did.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StreamStats {
@@ -107,7 +114,14 @@ impl WorldStreamer {
         let started = Instant::now();
         let config = self.generator.config();
         let chunk_size = config.chunk_world_size();
-        let centre = ChunkPos::from_world(focus, chunk_size);
+        // A focus beyond any sane world saturates to `i32::MAX`; clamping the
+        // chunk keeps the radius arithmetic and the eviction distances inside
+        // `i32` instead of overflowing in a debug build.
+        let raw = ChunkPos::from_world(focus, chunk_size);
+        let centre = ChunkPos::new(
+            raw.x.clamp(-MAX_FOCUS_CHUNK, MAX_FOCUS_CHUNK),
+            raw.y.clamp(-MAX_FOCUS_CHUNK, MAX_FOCUS_CHUNK),
+        );
         let view = config.view_distance_chunks.max(0);
 
         if self.last_centre == Some(centre) && self.last_view == view {
@@ -344,9 +358,10 @@ impl WorldStreamer {
         let max = ChunkPos::from_world(Vec3::new(region.max.x, 0.0, region.max.z), size);
         // Grow the range by one chunk: a collider clipped to a neighbouring
         // chunk can touch the region's boundary exactly, and the inclusive
-        // overlap test the caller applies must still see it.
-        let (min_x, max_x) = (min.x - 1, max.x + 1);
-        let (min_y, max_y) = (min.y - 1, max.y + 1);
+        // overlap test the caller applies must still see it. Saturating keeps a
+        // saturated coordinate from overflowing.
+        let (min_x, max_x) = (min.x.saturating_sub(1), max.x.saturating_add(1));
+        let (min_y, max_y) = (min.y.saturating_sub(1), max.y.saturating_add(1));
         self.chunks
             .iter()
             .filter(move |(pos, _)| {
@@ -532,6 +547,25 @@ mod tests {
     }
 
     #[test]
+    fn an_absurd_focus_does_not_overflow() {
+        let mut s = streamer(17);
+        for focus in [
+            Vec3::new(f32::MAX, 0.0, f32::MIN),
+            Vec3::new(1e30, 0.0, -1e30),
+            Vec3::new(-1e9, 0.0, 1e9),
+        ] {
+            let stats = s.update(focus);
+            assert!(stats.loaded > 0);
+            assert!(s.memory_bytes() > 0);
+            let mut out = Vec::new();
+            s.colliders_in(
+                Aabb::new(Vec3::new(-1e9, -1e9, -1e9), Vec3::new(1e9, 1e9, 1e9)),
+                &mut out,
+            );
+        }
+    }
+
+    #[test]
     fn clear_empties_the_cache() {
         let mut s = streamer(9);
         s.update(Vec3::ZERO);
@@ -572,8 +606,8 @@ mod tests {
         }
         let mut fast = Vec::new();
         s.colliders_in(region, &mut fast);
-        brute.sort_by(|a, b| a.1.cmp(&b.1));
-        fast.sort_by(|a, b| a.1.cmp(&b.1));
+        brute.sort_by_key(|entry| entry.1);
+        fast.sort_by_key(|entry| entry.1);
         assert_eq!(fast.len(), brute.len());
         assert_eq!(fast, brute);
         assert!(!fast.is_empty(), "a town chunk should have colliders");

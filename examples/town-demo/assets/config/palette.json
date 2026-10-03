@@ -1,0 +1,125 @@
+{
+  "name": "noxel-dawn",
+  "entries": [
+    {
+      "name": "shadow",
+      "color": "#17151FFF",
+      "description": "outlines, deepest shade, window and door frames"
+    },
+    {
+      "name": "stone_dark",
+      "color": "#555C66FF",
+      "description": "stone, rock and slate-roof shadow"
+    },
+    {
+      "name": "stone_mid",
+      "color": "#868D98FF",
+      "description": "stone, cobble, rock and slate-roof base"
+    },
+    {
+      "name": "stone_light",
+      "color": "#BCC3CDFF",
+      "description": "stone, plaza and slate-roof highlight"
+    },
+    {
+      "name": "grass_dark",
+      "color": "#2E6A32FF",
+      "description": "grass and bush shadow"
+    },
+    {
+      "name": "grass_mid",
+      "color": "#4B9440FF",
+      "description": "grass base"
+    },
+    {
+      "name": "grass_light",
+      "color": "#7CBE55FF",
+      "description": "grass highlight and blades"
+    },
+    {
+      "name": "leaf_dark",
+      "color": "#234F2BFF",
+      "description": "tree canopy shadow"
+    },
+    {
+      "name": "leaf_mid",
+      "color": "#3C7C3EFF",
+      "description": "tree canopy base"
+    },
+    {
+      "name": "dirt_dark",
+      "color": "#57402AFF",
+      "description": "dirt, wood, plank and trunk shadow"
+    },
+    {
+      "name": "dirt_mid",
+      "color": "#8A6640FF",
+      "description": "dirt, wood, plank and trunk base"
+    },
+    {
+      "name": "dirt_light",
+      "color": "#B58C5EFF",
+      "description": "dirt and plank highlight, skin shadow"
+    },
+    {
+      "name": "road_dark",
+      "color": "#4B463CFF",
+      "description": "road joints and cobble shadow"
+    },
+    {
+      "name": "road_mid",
+      "color": "#6E6759FF",
+      "description": "road cobble base"
+    },
+    {
+      "name": "sand_light",
+      "color": "#E3CE8CFF",
+      "description": "sand base, skin, lamp glow"
+    },
+    {
+      "name": "plaster_dark",
+      "color": "#BCA98AFF",
+      "description": "sand shadow, plaster shadow, floor-stone shading"
+    },
+    {
+      "name": "water_deep",
+      "color": "#1C4A69FF",
+      "description": "deep water and night reflections"
+    },
+    {
+      "name": "water_mid",
+      "color": "#2E7093FF",
+      "description": "mid-depth water and the shadow under a crest"
+    },
+    {
+      "name": "water_shallow",
+      "color": "#57A5BDFF",
+      "description": "shallow water and window glass"
+    },
+    {
+      "name": "foam",
+      "color": "#CFE7EAFF",
+      "description": "water sparkle, snow base, plaster highlight"
+    },
+    {
+      "name": "roof_red",
+      "color": "#A8443AFF",
+      "description": "roof tiles, tunic base, flower petals"
+    },
+    {
+      "name": "roof_dark",
+      "color": "#742C27FF",
+      "description": "roof shadow, brick, tunic shadow"
+    },
+    {
+      "name": "roof_light",
+      "color": "#D4715AFF",
+      "description": "roof highlight and tunic highlight"
+    },
+    {
+      "name": "plaster_mid",
+      "color": "#E7D9BAFF",
+      "description": "plaster base, snow highlight, counter top"
+    }
+  ]
+}

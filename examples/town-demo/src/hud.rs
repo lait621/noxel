@@ -77,6 +77,7 @@ pub fn draw_occluders(app: &App, framebuffer: &mut Framebuffer) {
 }
 
 /// Draws a marker at a world position.
+#[allow(dead_code)]
 pub fn draw_marker(app: &App, framebuffer: &mut Framebuffer, position: Vec3, color: Color8) {
     let overlay = Overlay::new();
     overlay.cross(framebuffer, &app.context.view, position, 0.6, color);
@@ -161,6 +162,7 @@ pub fn final_report(app: &App, args: &Args, wall_seconds: f32) -> String {
 
 /// A one-line status for a log.
 #[must_use]
+#[allow(dead_code)]
 pub fn status_line(app: &App) -> String {
     let stats = app.debug().stats();
     format!(
@@ -174,6 +176,7 @@ pub fn status_line(app: &App) -> String {
 
 /// The terrain summary the report prints.
 #[must_use]
+#[allow(dead_code)]
 pub fn terrain_line(plugin: &TerrainPlugin) -> String {
     crate::terrain::describe(plugin)
 }

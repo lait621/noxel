@@ -1,0 +1,193 @@
+{
+  "name": "market_stall",
+  "size": [
+    4,
+    2,
+    3
+  ],
+  "tags": [
+    "prop",
+    "commercial"
+  ],
+  "voxels": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "tile": 13,
+      "name": "plaza"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 2,
+      "tile": 17,
+      "name": "wall_wood"
+    }
+  ],
+  "props": [
+    {
+      "kind": "sign",
+      "position": [
+        1.5,
+        1.5,
+        -0.30000001192092896
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "crate",
+      "position": [
+        0.5,
+        0,
+        2.5
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "barrel",
+      "position": [
+        3.4000000953674316,
+        0,
+        2.4000000953674316
+      ],
+      "yaw": 0,
+      "scale": 1
+    }
+  ],
+  "spawns": [
+    {
+      "name": "vendor",
+      "position": [
+        2,
+        0,
+        1.5
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "customer",
+      "position": [
+        2,
+        0,
+        -0.5
+      ],
+      "yaw": 3.1415927410125732
+    }
+  ],
+  "occluders": []
+}

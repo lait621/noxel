@@ -11,7 +11,7 @@
 use noxel_asset::image::Image;
 use noxel_core::math::{Color8, tileable_value_2d};
 
-use crate::draw;
+use crate::draw::{self, Area};
 use crate::palette::*;
 
 /// Edge length of one terrain tile, in pixels.
@@ -99,7 +99,7 @@ pub fn tile(name: &str) -> Option<Image> {
 /// A grass field: a dithered shadow tone with scattered two-pixel blades.
 fn grass(base: Color8, shade: Color8, blade_tip: Color8, seed: u64) -> Image {
     let mut img = Image::new(SIZE, SIZE, base);
-    draw::dither(&mut img, 0, 0, 15, 15, shade, seed);
+    draw::dither(&mut img, draw::TILE, shade, seed);
 
     // Six blades, each a dark stalk with a lit tip, placed by hash.
     for i in 0..6 {
@@ -134,7 +134,7 @@ fn grass_flowers() -> Image {
 /// Bare earth: a dithered base with a few lit pebbles and their shadows.
 fn dirt(base: Color8, shade: Color8, pebble: Color8, seed: u64) -> Image {
     let mut img = Image::new(SIZE, SIZE, base);
-    draw::dither(&mut img, 0, 0, 15, 15, shade, seed);
+    draw::dither(&mut img, draw::TILE, shade, seed);
     for i in 0..5 {
         let x = 2 + (draw::hash01(i, 7, seed) * 11.0) as i32;
         let y = 2 + (draw::hash01(i, 9, seed) * 11.0) as i32;
@@ -147,21 +147,26 @@ fn dirt(base: Color8, shade: Color8, pebble: Color8, seed: u64) -> Image {
     img
 }
 
-/// Wind-blown sand: tileable dunes with a lit crest and a few dark specks.
+/// Wind-blown sand: long dunes with a lit crest and a few dark specks.
 fn sand() -> Image {
     let seed = draw::seed_of("sand");
     let mut img = Image::new(SIZE, SIZE, SAND_LIGHT);
     for y in 0..SIZE {
         for x in 0..SIZE {
-            let dune = tileable_value_2d(x as f32, y as f32, SIZE as i32, seed);
-            if dune > 0.34 {
+            let dune = tileable_value_2d(x as f32 * 0.5, y as f32 * 0.5, 8, seed);
+            let ripple = tileable_value_2d(x as f32 * 0.25, y as f32 * 0.5, 4, seed ^ 0x33);
+            if dune > 0.55 {
                 img.set(x, y, PLASTER_DARK);
-            } else if dune < -0.55 {
+            }
+            if ripple > 0.72 {
+                img.set(x, y, PLASTER_DARK);
+            }
+            if dune < -0.45 {
                 img.set(x, y, FOAM);
             }
         }
     }
-    draw::scatter(&mut img, 0, 0, 15, 15, PLASTER_DARK, 4, seed ^ 0x51);
+    draw::scatter(&mut img, draw::TILE, PLASTER_DARK, 3, seed ^ 0x51);
     draw::bevel(&mut img, FOAM, PLASTER_DARK);
     img
 }
@@ -169,7 +174,7 @@ fn sand() -> Image {
 /// Cracked stone: two wandering fissures, lit facets and a lit top edge.
 fn rock(base: Color8, facet: Color8, crack: Color8, seed: u64) -> Image {
     let mut img = Image::new(SIZE, SIZE, base);
-    draw::dither(&mut img, 0, 0, 15, 15, crack, seed);
+    draw::dither(&mut img, draw::TILE, crack, seed);
 
     // Two fissures: a vertical wander and a short diagonal branch.
     let mut x = 4;
@@ -209,7 +214,7 @@ fn cliff() -> Image {
     let mut img = Image::new(SIZE, SIZE, STONE_MID);
 
     // The ledge: the top three rows are the sunlit top of the rock.
-    draw::fill(&mut img, 0, 0, 15, 2, STONE_LIGHT);
+    draw::fill(&mut img, Area::new(0, 0, 15, 2), STONE_LIGHT);
     draw::hline(&mut img, 0, 15, 3, STONE_MID);
 
     // Strata: every fifth row is a darker bedding plane.
@@ -223,8 +228,11 @@ fn cliff() -> Image {
             draw::put(&mut img, x as i32, y as i32, STONE_DARK);
         }
     }
-    draw::scatter(&mut img, 0, 4, 15, 12, STONE_LIGHT, 10, seed);
-    draw::fill(&mut img, 0, 13, 15, 15, SHADOW);
+    draw::scatter(&mut img, Area::new(0, 4, 15, 12), STONE_LIGHT, 10, seed);
+    // The foot of the cliff: darker, but never a flat black bar.
+    draw::fill(&mut img, Area::new(0, 13, 15, 15), STONE_DARK);
+    draw::scatter(&mut img, Area::new(0, 13, 15, 15), SHADOW, 30, seed ^ 0x2C);
+    draw::hline(&mut img, 0, 15, 15, SHADOW);
     draw::hline(&mut img, 0, 15, 12, STONE_DARK);
     draw::bevel(&mut img, STONE_LIGHT, SHADOW);
     img
@@ -236,15 +244,16 @@ fn snow() -> Image {
     let mut img = Image::new(SIZE, SIZE, FOAM);
     for y in 0..SIZE {
         for x in 0..SIZE {
-            let drift = tileable_value_2d(x as f32, y as f32, SIZE as i32, seed);
-            if drift > 0.25 {
+            let drift = tileable_value_2d(x as f32 * 0.5, y as f32 * 0.5, 8, seed);
+            if drift > 0.45 {
                 img.set(x, y, PLASTER_MID);
-            } else if drift < -0.45 {
+            }
+            if drift < -0.50 {
                 img.set(x, y, STONE_LIGHT);
             }
         }
     }
-    draw::scatter(&mut img, 0, 0, 15, 15, PLASTER_MID, 5, seed ^ 0x33);
+    draw::scatter(&mut img, draw::TILE, PLASTER_MID, 4, seed ^ 0x33);
     draw::bevel(&mut img, PLASTER_MID, STONE_LIGHT);
     img
 }
@@ -254,40 +263,47 @@ fn snow() -> Image {
 /// One pixel of the water field, in world pixel coordinates.
 ///
 /// The function is periodic with period [`SIZE`] in both axes, which is exactly
-/// the condition for a tile drawn from it to wrap seamlessly.
+/// the condition for a tile drawn from it to wrap seamlessly. Both octaves are
+/// **under-sampled on purpose**: halving the sampling rate while halving the
+/// lattice period keeps the wrap at 16 while stretching the features, and it is
+/// the long wavelength that reads as a swell rather than as grain.
 #[must_use]
 pub fn water_pixel(x: i32, y: i32, deep: bool) -> Color8 {
-    let swell = tileable_value_2d(x as f32, y as f32, SIZE as i32, WATER_SEED);
-    // Half-frequency ripples: period 8 with half-speed sampling still wraps at
-    // 16, and the longer wavelength is what reads as a wave rather than grain.
-    let crest = tileable_value_2d(x as f32, y as f32 * 2.0, 8, WATER_SEED ^ 0x9E37_79B9);
+    let swell = tileable_value_2d(x as f32 * 0.5, y as f32 * 0.5, 8, WATER_SEED);
+    // A quarter-speed sample across against a half-speed one down: the ripples
+    // come out four times wider than they are tall, so the water has a current.
+    let ripple = tileable_value_2d(x as f32 * 0.25, y as f32 * 0.5, 4, WATER_SEED ^ 0x9E37_79B9);
 
     if deep {
         let mut color = WATER_DEEP;
-        if swell > 0.30 {
+        if swell > 0.05 {
             color = WATER_MID;
         }
-        if crest > 0.55 {
+        // A shaded trough under each crest is what gives the ripple its depth.
+        if ripple > 0.30 {
+            color = WATER_MID;
+        }
+        if ripple > 0.55 {
             color = WATER_SHALLOW;
         }
         let wrapped_x = x.rem_euclid(SIZE as i32);
         let wrapped_y = y.rem_euclid(SIZE as i32);
-        if crest > 0.85 && draw::hash01(wrapped_x, wrapped_y, WATER_SEED ^ 0x51ED) < 0.4 {
+        if ripple > 0.78 && draw::hash01(wrapped_x, wrapped_y, WATER_SEED ^ 0x51ED) < 0.35 {
             color = FOAM;
         }
         color
     } else {
         let mut color = WATER_SHALLOW;
-        if swell < -0.20 {
+        if swell < -0.05 {
             color = WATER_MID;
         }
-        if swell < -0.62 {
+        if swell < -0.45 {
             color = WATER_DEEP;
         }
-        if crest > 0.45 {
+        if ripple > 0.25 {
             color = WATER_MID;
         }
-        if crest > 0.68 {
+        if ripple > 0.52 {
             color = FOAM;
         }
         color
@@ -303,11 +319,12 @@ fn water(deep: bool) -> Image {
 
 /// One pixel of the road field, in world pixel coordinates.
 ///
-/// Cobbles are 4x4 cells with a one-pixel mortar joint on each cell's top and
+/// Cobbles are 4x4 cells with a one-pixel mortar joint along each cell's top and
 /// left edge. Because `SIZE` is a whole number of cells, a joint lands exactly
-/// on the tile seam, so four road tiles meeting at a corner produce one joint,
-/// not a double-width cross. The per-cobble tone is hashed from the cell index
-/// modulo the tile, which keeps the field periodic.
+/// on the tile seam, so four road tiles meeting at a corner produce **one**
+/// joint rather than a double-width cross: the last column and row of a tile are
+/// cobble body, never joint. The per-cobble tone is hashed from the cell index
+/// modulo the tile, which keeps the whole field periodic.
 #[must_use]
 pub fn road_pixel(x: i32, y: i32) -> Color8 {
     let local_x = x.rem_euclid(SIZE as i32);
@@ -321,23 +338,25 @@ pub fn road_pixel(x: i32, y: i32) -> Color8 {
         return ROAD_DARK;
     }
 
+    // Per-cobble tone, then the fixed shading of the stone itself. The shading
+    // uses the mid tone rather than the joint colour on purpose, so the seam
+    // edge of a tile cannot be mistaken for a second joint.
     let tone = draw::hash01(cell_x, cell_y, ROAD_SEED);
-    let mut color = if tone > 0.70 {
+    let mut color = if tone > 0.66 {
         STONE_MID
     } else if tone < 0.22 {
         ROAD_DARK
     } else {
         ROAD_MID
     };
-    // Each cobble is lit from the top-left and shaded at the bottom-right.
     if joint_x == 1 && joint_y <= 2 {
         color = STONE_MID;
     }
     if joint_x == 3 || joint_y == 3 {
-        color = ROAD_DARK;
+        color = ROAD_MID;
     }
     // Worn grit.
-    if draw::hash01(local_x, local_y, ROAD_SEED ^ 0x1234) < 0.06 {
+    if draw::hash01(local_x, local_y, ROAD_SEED ^ 0x1234) < 0.08 {
         color = STONE_LIGHT;
     }
     color
@@ -357,10 +376,7 @@ fn road_edge() -> Image {
     // Verge and kerb.
     draw::dither(
         &mut img,
-        0,
-        0,
-        15,
-        3,
+        Area::new(0, 0, 15, 3),
         GRASS_DARK,
         draw::seed_of("road_edge"),
     );
@@ -379,7 +395,10 @@ fn road_edge() -> Image {
             img.set(x, y, road_pixel(x as i32, y as i32));
         }
     }
-    draw::bevel(&mut img, GRASS_LIGHT, SHADOW);
+    // This tile carries its own lighting (a lit verge on top), and its paving
+    // rows are left exactly as the field drew them so the cobbles continue
+    // into the neighbouring road tile without a seam.
+    draw::hline(&mut img, 0, 15, 0, GRASS_LIGHT);
     img
 }
 
@@ -400,8 +419,8 @@ fn plaza() -> Image {
             img.set(x, y, color);
         }
     }
-    draw::scatter(&mut img, 0, 0, 15, 15, STONE_LIGHT, 7, PLAZA_SEED);
-    draw::scatter(&mut img, 0, 0, 15, 15, STONE_DARK, 5, PLAZA_SEED ^ 0x77);
+    draw::scatter(&mut img, draw::TILE, STONE_LIGHT, 7, PLAZA_SEED);
+    draw::scatter(&mut img, draw::TILE, STONE_DARK, 5, PLAZA_SEED ^ 0x77);
     draw::bevel(&mut img, STONE_LIGHT, STONE_DARK);
     img
 }

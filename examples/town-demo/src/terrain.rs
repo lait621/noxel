@@ -20,11 +20,11 @@ use noxel_asset::format::TileDef;
 use noxel_asset::format::TileSet;
 use noxel_asset::image::Image;
 use noxel_asset::texture::Texture;
-use noxel_core::math::{Aabb, Transform, Vec2, Vec3};
+use noxel_core::math::{Aabb, Ray, Transform, Vec2, Vec3};
 use noxel_physics::{LAYER_WORLD, QueryFilter};
 use noxel_render::material::Material;
 use noxel_render::mesh::{Mesh, Vertex};
-use noxel_render::scene::{InstanceHandle, Scene};
+use noxel_render::scene::InstanceHandle;
 use noxel_world::WorldChunkPos;
 use noxel_world::chunk::Chunk;
 
@@ -33,8 +33,16 @@ const MARGIN_CHUNKS: i32 = 1;
 
 /// The terrain renderer.
 pub struct TerrainPlugin {
-    /// The material every chunk shares.
+    /// The material every chunk's ground shares.
     material: Option<noxel_render::material::MaterialHandle>,
+    /// The material chunk buildings share.
+    building_material: Option<noxel_render::material::MaterialHandle>,
+    /// The material chunk props share.
+    prop_material: Option<noxel_render::material::MaterialHandle>,
+    /// Building and prop instances, keyed by chunk position.
+    detail_instances: HashMap<WorldChunkPos, Vec<InstanceHandle>>,
+    /// Building and prop meshes, so a despawn can release them.
+    detail_meshes: HashMap<WorldChunkPos, Vec<noxel_render::material::MeshHandle>>,
     /// Chunk instances currently in the scene, keyed by chunk position.
     instances: HashMap<WorldChunkPos, InstanceHandle>,
     /// Chunk meshes, so a despawn can release them.
@@ -49,6 +57,13 @@ pub struct TerrainPlugin {
     pub static_bodies: usize,
     /// The texture the terrain samples.
     pub texture_name: String,
+    /// Terrain atlas size in pixels, needed to map a tile's pixel `uv` to
+    /// texture coordinates.
+    pub terrain_atlas: (u32, u32),
+    /// Building atlas size.
+    pub building_atlas: (u32, u32),
+    /// Prop atlas size.
+    pub prop_atlas: (u32, u32),
 }
 
 impl Default for TerrainPlugin {
@@ -63,6 +78,10 @@ impl TerrainPlugin {
     pub fn new() -> Self {
         Self {
             material: None,
+            building_material: None,
+            prop_material: None,
+            detail_instances: HashMap::new(),
+            detail_meshes: HashMap::new(),
             instances: HashMap::new(),
             meshes: HashMap::new(),
             bodies: HashMap::new(),
@@ -70,13 +89,24 @@ impl TerrainPlugin {
             triangles_built: 0,
             static_bodies: 0,
             texture_name: String::new(),
+            terrain_atlas: (256, 16),
+            building_atlas: (256, 16),
+            prop_atlas: (256, 32),
         }
     }
 
+    #[allow(dead_code)]
     /// Number of chunks currently drawn.
     #[must_use]
     pub fn resident(&self) -> usize {
         self.instances.len()
+    }
+
+    #[allow(dead_code)]
+    /// Number of building and prop instances currently drawn.
+    #[must_use]
+    pub fn detail_instances(&self) -> usize {
+        self.detail_instances.values().map(Vec::len).sum()
     }
 
     /// Builds the shared material, loading the terrain texture if it exists.
@@ -94,6 +124,11 @@ impl TerrainPlugin {
             })
             .unwrap_or_default();
         let texture = load_texture(app, &name);
+        if let Some(handle) = texture {
+            if let Some(tex) = app.scene().texture(handle) {
+                self.terrain_atlas = (tex.width(), tex.height());
+            }
+        }
         self.texture_name = name;
         let material = match texture {
             Some(handle) => {
@@ -102,6 +137,27 @@ impl TerrainPlugin {
             None => Material::unlit("terrain", noxel_core::math::Color::WHITE),
         };
         self.material = Some(app.scene_mut().add_material(material));
+
+        // Buildings sample the building atlas; props are flat-coloured, because
+        // a 24-pixel canopy drawn as a billboard in a busy atlas reads worse
+        // from directly above than a solid cone of the right green does.
+        let buildings_texture = load_texture(app, "buildings.png");
+        if let Some(handle) = buildings_texture {
+            if let Some(tex) = app.scene().texture(handle) {
+                self.building_atlas = (tex.width(), tex.height());
+            }
+        }
+        let building_material = match buildings_texture {
+            Some(handle) => {
+                Material::lit("buildings", noxel_core::math::Color::WHITE).with_texture(handle)
+            }
+            None => Material::lit("buildings", noxel_core::math::Color::rgb(0.78, 0.72, 0.62)),
+        };
+        self.building_material = Some(app.scene_mut().add_material(building_material));
+        self.prop_material = Some(app.scene_mut().add_material(Material::lit(
+            "props",
+            noxel_core::math::Color::rgb(0.30, 0.46, 0.24),
+        )));
     }
 
     /// Syncs the scene and the physics world to the chunks around the camera.
@@ -129,7 +185,7 @@ impl TerrainPlugin {
             .collect();
         for pos in stale {
             if let Some(handle) = self.instances.remove(&pos) {
-                app.scene_mut().despawn(handle);
+                app.scene_mut().remove_instance(handle);
             }
             if let Some(mesh) = self.meshes.remove(&pos) {
                 app.scene_mut().remove_mesh(mesh);
@@ -137,6 +193,16 @@ impl TerrainPlugin {
             if let Some(bodies) = self.bodies.remove(&pos) {
                 for body in bodies {
                     app.physics_mut().remove(body);
+                }
+            }
+            if let Some(details) = self.detail_instances.remove(&pos) {
+                for handle in details {
+                    app.scene_mut().remove_instance(handle);
+                }
+            }
+            if let Some(meshes) = self.detail_meshes.remove(&pos) {
+                for mesh in meshes {
+                    app.scene_mut().remove_mesh(mesh);
                 }
             }
         }
@@ -147,10 +213,22 @@ impl TerrainPlugin {
             if self.instances.contains_key(&pos) {
                 continue;
             }
-            let Some(chunk) = app.context.streamer.chunk(pos) else {
-                continue;
+            // Everything read from the streamer is copied out first: the chunk
+            // borrows `app` immutably and the scene needs it mutably.
+            let tile_set = std::sync::Arc::clone(&app.context.tile_set);
+            let terrain_atlas = self.terrain_atlas;
+            let building_atlas = self.building_atlas;
+            let (mesh, building_mesh, prop_mesh, collider_bounds) = {
+                let Some(chunk) = app.context.streamer.chunk(pos) else {
+                    continue;
+                };
+                (
+                    build_chunk_mesh(chunk, &tile_set, terrain_atlas),
+                    crate::village::build_building_mesh(chunk, &tile_set, building_atlas),
+                    crate::village::build_prop_mesh(chunk, self.prop_atlas),
+                    chunk.colliders.clone(),
+                )
             };
-            let mesh = build_chunk_mesh(chunk, &app.context.tile_set);
             self.triangles_built += (mesh.indices.len() / 3) as u64;
             let handle = app.scene_mut().add_mesh(mesh);
             let instance = app.scene_mut().spawn(
@@ -165,9 +243,45 @@ impl TerrainPlugin {
             self.instances.insert(pos, instance);
             self.chunks_built += 1;
 
+            // Buildings and props: two extra instances per chunk.
+            let mut details = Vec::new();
+            let mut detail_meshes = Vec::new();
+            if let Some(material) = self.building_material {
+                if !building_mesh.is_empty() {
+                    self.triangles_built += (building_mesh.indices.len() / 3) as u64;
+                    let handle = app.scene_mut().add_mesh(building_mesh);
+                    let instance = app.scene_mut().spawn(
+                        format!("buildings_{}_{}", pos.x, pos.y),
+                        handle,
+                        material,
+                        Transform::IDENTITY,
+                    );
+                    details.push(instance);
+                    detail_meshes.push(handle);
+                }
+            }
+            if let Some(material) = self.prop_material {
+                if !prop_mesh.is_empty() {
+                    self.triangles_built += (prop_mesh.indices.len() / 3) as u64;
+                    let handle = app.scene_mut().add_mesh(prop_mesh);
+                    let instance = app.scene_mut().spawn(
+                        format!("props_{}_{}", pos.x, pos.y),
+                        handle,
+                        material,
+                        Transform::IDENTITY,
+                    );
+                    details.push(instance);
+                    detail_meshes.push(handle);
+                }
+            }
+            if !details.is_empty() {
+                self.detail_instances.insert(pos, details);
+                self.detail_meshes.insert(pos, detail_meshes);
+            }
+
             // Static collision for everything solid in the chunk.
             let mut bodies = Vec::new();
-            for (bounds, user_data) in chunk.colliders.iter() {
+            for (bounds, user_data) in collider_bounds.iter() {
                 if bounds.is_empty() {
                     continue;
                 }
@@ -178,6 +292,7 @@ impl TerrainPlugin {
         self.static_bodies = self.bodies.values().map(Vec::len).sum();
     }
 
+    #[allow(dead_code)]
     /// The height of the ground at a world position, from the streamed world.
     #[must_use]
     pub fn ground_height(app: &App, position: Vec3) -> f32 {
@@ -190,17 +305,19 @@ impl TerrainPlugin {
         app.context.streamer.is_walkable(position)
     }
 
+    #[allow(dead_code)]
     /// Casts a ray downwards and returns the ground height under `position`.
     #[must_use]
     pub fn sample_ground(app: &App, position: Vec3) -> Option<f32> {
         let from = position + Vec3::Y * 8.0;
-        let hit = app.physics().raycast(
-            from,
-            Vec3::DOWN,
-            40.0,
-            QueryFilter::ALL.with_mask(LAYER_WORLD),
-        );
-        hit.map(|h| from.y - h.distance)
+        let ray = Ray::with_max_t(from, Vec3::DOWN, 40.0);
+        let filter = QueryFilter {
+            mask: LAYER_WORLD,
+            ignore: None,
+            include_sensors: false,
+            include_static: true,
+        };
+        app.physics().raycast(&ray, filter).map(|hit| hit.point.y)
     }
 }
 
@@ -211,7 +328,7 @@ impl TerrainPlugin {
 /// topologically consistent index buffer and buys little at this scale, while
 /// duplicating them keeps the UV mapping trivially correct per tile.
 #[must_use]
-pub fn build_chunk_mesh(chunk: &Chunk, set: &TileSet) -> Mesh {
+pub fn build_chunk_mesh(chunk: &Chunk, set: &TileSet, atlas: (u32, u32)) -> Mesh {
     let tiles = chunk.tiles();
     let tile_size = 1.0f32;
     let origin = Vec3::new(
@@ -220,9 +337,10 @@ pub fn build_chunk_mesh(chunk: &Chunk, set: &TileSet) -> Mesh {
         chunk.pos.y as f32 * tiles as f32 * tile_size,
     );
 
-    let mut mesh = Mesh::default();
-    mesh.name = format!("chunk_{}_{}", chunk.pos.x, chunk.pos.y);
-    let cell = 1.0 / set.tile_size.max(1) as f32;
+    let mut mesh = Mesh {
+        name: format!("chunk_{}_{}", chunk.pos.x, chunk.pos.y),
+        ..Mesh::default()
+    };
 
     for ty in 0..tiles {
         for tx in 0..tiles {
@@ -231,7 +349,7 @@ pub fn build_chunk_mesh(chunk: &Chunk, set: &TileSet) -> Mesh {
             let height = chunk.height(tx, ty);
             let x0 = origin.x + tx as f32 * tile_size;
             let z0 = origin.z + ty as f32 * tile_size;
-            let (u0, v0, u1, v1) = uv_rect(def, cell);
+            let (u0, v0, u1, v1) = uv_rect(def, atlas);
             let base = mesh.vertices.len() as u32;
 
             // Slight per-tile height variation makes the ground read as
@@ -263,17 +381,19 @@ pub fn build_chunk_mesh(chunk: &Chunk, set: &TileSet) -> Mesh {
     mesh
 }
 
-/// The `[u0, v0, u1, v1]` texture rectangle for a tile.
+/// The `[u0, v0, u1, v1]` texture rectangle for a tile, given the atlas size in
+/// pixels.
 ///
 /// The half-texel inset is what stops a neighbouring tile bleeding into this one
 /// when the texture is sampled bilinearly or when the atlas has mips.
 #[must_use]
-pub fn uv_rect(def: &TileDef, cell: f32) -> (f32, f32, f32, f32) {
-    let inset = cell * 0.5;
-    let u0 = def.uv[0] as f32 * cell + inset;
-    let v0 = def.uv[1] as f32 * cell + inset;
-    let u1 = (def.uv[0] + def.uv[2]) as f32 * cell - inset;
-    let v1 = (def.uv[1] + def.uv[3]) as f32 * cell - inset;
+pub fn uv_rect(def: &TileDef, atlas: (u32, u32)) -> (f32, f32, f32, f32) {
+    let (w, h) = (atlas.0.max(1) as f32, atlas.1.max(1) as f32);
+    let (du, dv) = (0.5 / w, 0.5 / h);
+    let u0 = def.uv[0] as f32 / w + du;
+    let v0 = def.uv[1] as f32 / h + dv;
+    let u1 = (def.uv[0] + def.uv[2]) as f32 / w - du;
+    let v1 = (def.uv[1] + def.uv[3]) as f32 / h - dv;
     (u0, v0, u1, v1)
 }
 
@@ -309,7 +429,7 @@ fn load_texture(app: &mut App, name: &str) -> Option<noxel_render::material::Tex
     // A missing texture must not stop the demo: build a visible placeholder so a
     // fresh checkout without generated assets still shows a world.
     let image = placeholder_texture();
-    let texture = Texture::new(image);
+    let texture = Texture::from_image(image);
     Some(app.scene_mut().add_texture(texture))
 }
 
@@ -330,18 +450,17 @@ pub fn placeholder_texture() -> Image {
 
 /// A helper the HUD uses to describe the terrain state.
 #[must_use]
+#[allow(dead_code)]
 pub fn describe(plugin: &TerrainPlugin) -> String {
     format!(
-        "terrain {} chunks {} tris {} static {}",
+        "terrain {} chunks {} detail {} tris {} static {}",
         plugin.resident(),
+        plugin.detail_instances(),
         plugin.triangles_built,
         plugin.static_bodies,
         plugin.texture_name
     )
 }
-
-/// Re-exported so the demo can name the type without importing `noxel_render`.
-pub type SceneInstance = InstanceHandle;
 
 #[cfg(test)]
 mod tests {
@@ -369,19 +488,17 @@ mod tests {
     #[test]
     fn uv_rect_is_inset_by_half_a_texel() {
         let def = &set().tiles[0];
-        let (u0, v0, u1, v1) = uv_rect(def, 1.0 / 16.0);
-        assert!(u0 > 0.0 && v0 > 0.0);
-        assert!(u1 < 1.0 && v1 < 1.0);
-        let inset = 1.0 / 32.0;
-        assert!((u0 - inset).abs() < 1e-6, "{u0}");
-        assert!((u1 - (1.0 - inset)).abs() < 1e-6, "{u1}");
+        let (u0, v0, u1, v1) = uv_rect(def, (16, 16));
+        assert!((u0 - 0.5 / 16.0).abs() < 1e-6, "{u0}");
+        assert!((u1 - (1.0 - 0.5 / 16.0)).abs() < 1e-6, "{u1}");
+        assert!(v0 > 0.0 && v1 < 1.0);
     }
 
     #[test]
     fn chunk_mesh_has_four_vertices_per_tile() {
         let set = set();
         let chunk = Chunk::empty(ChunkPos::new(0, 0), 4, 1.0, BiomeId::PLAINS);
-        let mesh = build_chunk_mesh(&chunk, &set);
+        let mesh = build_chunk_mesh(&chunk, &set, (256, 16));
         assert_eq!(mesh.vertices.len(), 4 * 4 * 4);
         assert_eq!(mesh.indices.len(), 4 * 4 * 6);
     }
@@ -390,7 +507,7 @@ mod tests {
     fn chunk_mesh_winds_upward() {
         let set = set();
         let chunk = Chunk::empty(ChunkPos::new(0, 0), 2, 1.0, BiomeId::PLAINS);
-        let mesh = build_chunk_mesh(&chunk, &set);
+        let mesh = build_chunk_mesh(&chunk, &set, (256, 16));
         for tri in 0..mesh.triangle_count() {
             let n = mesh.triangle_normal(tri);
             assert!(n.y > 0.9, "tri {tri} faces {n:?}");
@@ -401,7 +518,7 @@ mod tests {
     fn chunk_mesh_is_positioned_by_chunk_coordinate() {
         let set = set();
         let chunk = Chunk::empty(ChunkPos::new(2, -1), 4, 1.0, BiomeId::PLAINS);
-        let mesh = build_chunk_mesh(&chunk, &set);
+        let mesh = build_chunk_mesh(&chunk, &set, (256, 16));
         assert!(mesh.bounds.min.x > 7.0, "{:?}", mesh.bounds);
         assert!(mesh.bounds.max.z <= 0.0, "{:?}", mesh.bounds);
     }
@@ -413,7 +530,7 @@ mod tests {
             ..set()
         };
         let chunk = Chunk::empty(ChunkPos::new(0, 0), 4, 1.0, BiomeId::PLAINS);
-        let mesh = build_chunk_mesh(&chunk, &empty);
+        let mesh = build_chunk_mesh(&chunk, &empty, (256, 16));
         assert!(mesh.is_empty());
     }
 
@@ -428,7 +545,9 @@ mod tests {
     #[test]
     fn overlap_check_expands_by_the_margin() {
         let bounds = Aabb::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(32.0, 4.0, 32.0));
-        let far = Aabb::new(Vec3::new(64.5, 0.0, 0.0), Vec3::new(96.0, 4.0, 32.0));
+        // 63.0 is inside one chunk of margin (32 m) from the first box's max of
+        // 32.0; 96.0 would not be.
+        let far = Aabb::new(Vec3::new(63.0, 0.0, 0.0), Vec3::new(96.0, 4.0, 32.0));
         assert!(!overlaps(&bounds, &far, 0));
         assert!(
             overlaps(&bounds, &far, 1),

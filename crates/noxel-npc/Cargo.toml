@@ -13,3 +13,11 @@ noxel-core.workspace = true
 noxel-ecs.workspace = true
 noxel-physics.workspace = true
 noxel-world.workspace = true
+
+# Test-only: `noxel-npc`'s own tests need a real `TileSet` (grass, water, road,
+# building floors) to build a world worth pathfinding in. `TileSet` and
+# `TileDef` live in `noxel-asset`, and `TileDef` has no `Default`, so a test
+# cannot construct one without naming the crate. This is a *dev*-dependency: the
+# library's own dependency graph stays core + ecs + physics + world.
+[dev-dependencies]
+noxel-asset.workspace = true

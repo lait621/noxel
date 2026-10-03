@@ -237,7 +237,6 @@ mod tests {
     #[derive(Debug, Default)]
     struct Recorder {
         calls: Vec<&'static str>,
-        enabled: bool,
     }
 
     impl Plugin for Recorder {
@@ -289,8 +288,39 @@ mod tests {
 
     #[test]
     fn registry_runs_every_hook_in_order() {
+        // The plugin is boxed, so its call list cannot be read back through the
+        // registry; instead, record into a shared cell through a resource.
+        #[derive(Default)]
+        struct Shared(Vec<&'static str>);
+        let shared = std::rc::Rc::new(std::cell::RefCell::new(Shared::default()));
+
+        struct Recorder2(std::rc::Rc<std::cell::RefCell<Shared>>);
+        impl Plugin for Recorder2 {
+            fn name(&self) -> &str {
+                "recorder2"
+            }
+            fn build(&mut self, _app: &mut App) {
+                self.0.borrow_mut().0.push("build");
+            }
+            fn update(&mut self, _app: &mut App, _dt: f32) {
+                self.0.borrow_mut().0.push("update");
+            }
+            fn frame(&mut self, _app: &mut App, _dt: f32) {
+                self.0.borrow_mut().0.push("frame");
+            }
+            fn pre_cull(&mut self, _app: &mut App, _dt: f32) {
+                self.0.borrow_mut().0.push("pre_cull");
+            }
+            fn draw(&mut self, _app: &mut App, _fb: &mut noxel_render::Framebuffer) {
+                self.0.borrow_mut().0.push("draw");
+            }
+            fn shutdown(&mut self, _app: &mut App) {
+                self.0.borrow_mut().0.push("shutdown");
+            }
+        }
+
         let mut registry = PluginRegistry::new();
-        registry.push(Box::new(Recorder::default()));
+        registry.push(Box::new(Recorder2(std::rc::Rc::clone(&shared))));
         let mut app = app();
         registry.build(&mut app);
         registry.update(&mut app, 1.0 / 60.0);
@@ -299,9 +329,10 @@ mod tests {
         let mut fb = noxel_render::Framebuffer::new(4, 4);
         registry.draw(&mut app, &mut fb);
         registry.shutdown(&mut app);
-        // The recorder's own list is inside the box; check by name lookup
-        // instead of reaching into it.
-        assert_eq!(registry.index_of("recorder"), Some(0));
+        assert_eq!(
+            shared.borrow().0,
+            vec!["build", "update", "frame", "pre_cull", "draw", "shutdown"]
+        );
     }
 
     #[test]

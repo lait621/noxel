@@ -1,0 +1,1305 @@
+{
+  "name": "inn",
+  "size": [
+    8,
+    4,
+    6
+  ],
+  "tags": [
+    "building",
+    "commercial",
+    "residential"
+  ],
+  "voxels": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 1,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 2,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 4,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 5,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "tile": 20,
+      "name": "wall_door"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 1,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 2,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 3,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 4,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 4,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 4,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 4,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 0,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 1,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 2,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 3,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 3,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 3,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 3,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 3,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 3,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 3,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 3,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 4,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 4,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 4,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 4,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 4,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 4,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 4,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 4,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 5,
+      "tile": 17,
+      "name": "wall_wood"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 0,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 1,
+      "tile": 24,
+      "name": "chimney"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 1,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 2,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 3,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 4,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 5,
+      "tile": 22,
+      "name": "roof_slate"
+    }
+  ],
+  "props": [
+    {
+      "kind": "sign",
+      "position": [
+        4.5,
+        0,
+        0.5
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "barrel",
+      "position": [
+        0.5,
+        0,
+        5.400000095367432
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "barrel",
+      "position": [
+        1.5,
+        0,
+        5.400000095367432
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "crate",
+      "position": [
+        7.400000095367432,
+        0,
+        5.400000095367432
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "lamp_post",
+      "position": [
+        2.5,
+        0,
+        0.5
+      ],
+      "yaw": 0,
+      "scale": 1
+    }
+  ],
+  "spawns": [
+    {
+      "name": "door",
+      "position": [
+        3.5,
+        0,
+        -0.5
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "innkeeper",
+      "position": [
+        2.5,
+        0,
+        3.5
+      ],
+      "yaw": 3.1415927410125732
+    },
+    {
+      "name": "guest",
+      "position": [
+        5.5,
+        0,
+        3.5
+      ],
+      "yaw": 3.1415927410125732
+    },
+    {
+      "name": "guard",
+      "position": [
+        2.5,
+        0,
+        0.6000000238418579
+      ],
+      "yaw": 0
+    }
+  ],
+  "occluders": [
+    [
+      0,
+      1,
+      0,
+      8,
+      3,
+      6
+    ]
+  ]
+}

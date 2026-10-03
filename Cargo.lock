@@ -65,6 +65,7 @@ dependencies = [
 name = "noxel-npc"
 version = "0.1.0"
 dependencies = [
+ "noxel-asset",
  "noxel-core",
  "noxel-ecs",
  "noxel-physics",

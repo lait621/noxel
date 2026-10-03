@@ -8,7 +8,7 @@
 use noxel_asset::image::Image;
 use noxel_core::math::Color8;
 
-use crate::draw;
+use crate::draw::{self, Area};
 use crate::palette::*;
 
 /// Edge length of one building tile, in pixels.
@@ -78,7 +78,7 @@ pub fn tile(name: &str) -> Option<Image> {
 fn wall_plaster() -> Image {
     let seed = draw::seed_of("wall_plaster");
     let mut img = Image::new(SIZE, SIZE, PLASTER_MID);
-    draw::dither(&mut img, 0, 0, 15, 15, PLASTER_DARK, seed);
+    draw::dither(&mut img, draw::TILE, PLASTER_DARK, seed);
     // Two hairline cracks wandering down the render.
     let mut crack_x = 4;
     for y in 2..13 {
@@ -90,7 +90,7 @@ fn wall_plaster() -> Image {
     draw::put(&mut img, 11, 5, PLASTER_DARK);
     draw::put(&mut img, 11, 6, PLASTER_DARK);
     draw::put(&mut img, 11, 7, FOAM);
-    draw::scatter(&mut img, 0, 0, 15, 15, FOAM, 6, seed ^ 0x21);
+    draw::scatter(&mut img, draw::TILE, FOAM, 6, seed ^ 0x21);
     draw::bevel(&mut img, FOAM, PLASTER_DARK);
     img
 }
@@ -158,13 +158,14 @@ fn wall_stone() -> Image {
 fn wall_window() -> Image {
     let seed = draw::seed_of("wall_window");
     let mut img = wall_plaster();
-    draw::fill(&mut img, 2, 2, 13, 13, SHADOW);
-    draw::fill(&mut img, 3, 3, 12, 12, WATER_SHALLOW);
-    // Sky reflected in the upper panes, dark room in the lower ones.
-    draw::fill(&mut img, 3, 3, 12, 7, FOAM);
-    draw::fill(&mut img, 3, 8, 12, 12, WATER_MID);
-    draw::hline(&mut img, 3, 12, 8, WATER_DEEP);
-    draw::scatter(&mut img, 3, 3, 12, 12, WATER_SHALLOW, 18, seed);
+    draw::fill(&mut img, Area::new(2, 2, 13, 13), SHADOW);
+    // Three bands of glass: the sky it reflects, the sheet itself, and the
+    // dark room behind it. Reading top to bottom is what makes it a window
+    // rather than a blue square.
+    draw::fill(&mut img, Area::new(3, 3, 12, 12), WATER_SHALLOW);
+    draw::fill(&mut img, Area::new(3, 3, 12, 4), FOAM);
+    draw::fill(&mut img, Area::new(3, 9, 12, 12), WATER_MID);
+    draw::scatter(&mut img, Area::new(3, 5, 12, 8), FOAM, 12, seed ^ 0x66);
     // Muntins and sill.
     draw::vline(&mut img, 7, 3, 12, SHADOW);
     draw::vline(&mut img, 8, 3, 12, SHADOW);
@@ -178,17 +179,17 @@ fn wall_window() -> Image {
 fn wall_door() -> Image {
     let seed = draw::seed_of("wall_door");
     let mut img = Image::new(SIZE, SIZE, PLASTER_MID);
-    draw::dither(&mut img, 0, 0, 15, 15, PLASTER_DARK, seed);
-    draw::fill(&mut img, 1, 1, 14, 15, SHADOW);
-    draw::fill(&mut img, 2, 2, 13, 15, DIRT_MID);
+    draw::dither(&mut img, draw::TILE, PLASTER_DARK, seed);
+    draw::fill(&mut img, Area::new(1, 1, 14, 15), SHADOW);
+    draw::fill(&mut img, Area::new(2, 2, 13, 15), DIRT_MID);
     // Vertical boards.
     for x in [3, 7, 11] {
         draw::vline(&mut img, x, 2, 15, DIRT_DARK);
     }
     draw::vline(&mut img, 2, 2, 15, DIRT_LIGHT);
     // Recessed panels.
-    draw::frame(&mut img, 4, 4, 6, 9, DIRT_LIGHT);
-    draw::frame(&mut img, 9, 4, 11, 9, DIRT_LIGHT);
+    draw::frame(&mut img, Area::new(4, 4, 6, 9), DIRT_LIGHT);
+    draw::frame(&mut img, Area::new(9, 4, 11, 9), DIRT_LIGHT);
     // Hinges and handle.
     draw::hline(&mut img, 2, 5, 4, STONE_MID);
     draw::hline(&mut img, 2, 5, 11, STONE_MID);
@@ -231,7 +232,7 @@ fn roof_edge() -> Image {
     let seed = draw::seed_of("roof_edge");
     let mut img = Image::new(SIZE, SIZE, ROOF_DARK);
     draw::hline(&mut img, 0, 15, 0, ROOF_LIGHT);
-    draw::fill(&mut img, 0, 1, 15, 2, ROOF_RED);
+    draw::fill(&mut img, Area::new(0, 1, 15, 2), ROOF_RED);
     draw::hline(&mut img, 0, 15, 3, ROOF_DARK);
     draw::hline(&mut img, 0, 15, 4, SHADOW);
     for y in 5..SIZE {
@@ -270,11 +271,17 @@ fn chimney() -> Image {
         }
     }
     // Cap.
-    draw::fill(&mut img, 0, 0, 15, 1, STONE_MID);
+    draw::fill(&mut img, Area::new(0, 0, 15, 1), STONE_MID);
     draw::hline(&mut img, 0, 15, 0, STONE_LIGHT);
     draw::hline(&mut img, 0, 15, 2, SHADOW);
     // Soot above the flue.
-    draw::scatter(&mut img, 4, 3, 11, 6, SHADOW, 35, draw::seed_of("chimney"));
+    draw::scatter(
+        &mut img,
+        Area::new(4, 3, 11, 6),
+        SHADOW,
+        35,
+        draw::seed_of("chimney"),
+    );
     draw::bevel(&mut img, STONE_LIGHT, SHADOW);
     img
 }
@@ -343,7 +350,7 @@ fn floor_stone() -> Image {
 fn counter() -> Image {
     let seed = draw::seed_of("counter");
     let mut img = Image::new(SIZE, SIZE, DIRT_MID);
-    draw::fill(&mut img, 0, 0, 15, 2, PLASTER_MID);
+    draw::fill(&mut img, Area::new(0, 0, 15, 2), PLASTER_MID);
     draw::hline(&mut img, 0, 15, 0, FOAM);
     draw::hline(&mut img, 0, 15, 3, PLASTER_DARK);
     // Front: vertical boards with a moulding.

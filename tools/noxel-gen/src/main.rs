@@ -46,7 +46,7 @@ use std::process::ExitCode;
 ///
 /// It is small enough to survive the JSON round trip through an `f64` without
 /// losing precision, which matters because it is written into `world/demo.json`.
-pub const DEFAULT_SEED: u64 = 0x4E4F_5845_4C;
+pub const DEFAULT_SEED: u64 = 0x004E_4F58_454C;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

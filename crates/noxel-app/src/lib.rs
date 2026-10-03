@@ -58,6 +58,7 @@ pub mod plugin;
 pub mod runner;
 
 pub use app::{App, AppConfig, AppContext, AppError, InputState};
+pub use noxel_debug::{DebugConfig, DumpFormat};
 pub use plugin::{Plugin, PluginRegistry};
 pub use runner::{HeadlessReport, RunMode};
 

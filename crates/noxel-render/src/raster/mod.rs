@@ -1025,15 +1025,28 @@ fn raster_tile_in_band(
                 continue;
             }
             let i3 = pixel * 3;
-            if alpha >= 1.0 {
-                band.color[i3] = rgb[0];
-                band.color[i3 + 1] = rgb[1];
-                band.color[i3 + 2] = rgb[2];
-            } else {
-                let inv = 1.0 - alpha;
-                band.color[i3] = rgb[0] * alpha + band.color[i3] * inv;
-                band.color[i3 + 1] = rgb[1] * alpha + band.color[i3 + 1] * inv;
-                band.color[i3 + 2] = rgb[2] * alpha + band.color[i3 + 2] * inv;
+            match material.alpha_mode {
+                // Additive is *additive*: a fireball, a lamp glow or a magic
+                // sparkle adds its radiance to what is behind it. Compositing it
+                // source-over would darken the background instead, which is the
+                // opposite of the intent and a real difference at a 320x180
+                // internal resolution where the effect is the whole pixel.
+                AlphaMode::Additive => {
+                    band.color[i3] += rgb[0] * alpha;
+                    band.color[i3 + 1] += rgb[1] * alpha;
+                    band.color[i3 + 2] += rgb[2] * alpha;
+                }
+                _ if alpha >= 1.0 => {
+                    band.color[i3] = rgb[0];
+                    band.color[i3 + 1] = rgb[1];
+                    band.color[i3 + 2] = rgb[2];
+                }
+                _ => {
+                    let inv = 1.0 - alpha;
+                    band.color[i3] = rgb[0] * alpha + band.color[i3] * inv;
+                    band.color[i3 + 1] = rgb[1] * alpha + band.color[i3 + 1] * inv;
+                    band.color[i3 + 2] = rgb[2] * alpha + band.color[i3 + 2] * inv;
+                }
             }
             // Transparent surfaces test depth but do not write it, which is what
             // lets a second transparent surface behind them still be seen.

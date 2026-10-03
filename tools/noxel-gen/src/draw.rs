@@ -45,6 +45,11 @@ pub fn put(img: &mut Image, x: i32, y: i32, color: Color8) {
     img.set(x as u32, y as u32, color);
 }
 
+/// Erases a pixel, clipped to the image.
+pub fn clear(img: &mut Image, x: i32, y: i32) {
+    put(img, x, y, Color8::TRANSPARENT);
+}
+
 /// Draws an inclusive horizontal run, clipped to the image.
 pub fn hline(img: &mut Image, x0: i32, x1: i32, y: i32, color: Color8) {
     let (from, to) = if x0 <= x1 { (x0, x1) } else { (x1, x0) };
@@ -61,39 +66,59 @@ pub fn vline(img: &mut Image, x: i32, y0: i32, y1: i32, color: Color8) {
     }
 }
 
+/// An inclusive pixel rectangle: the region a routine works over.
+///
+/// Taking a rectangle as one value keeps a call like
+/// `scatter(&mut tile, TILE, FOAM, 5, seed)` readable, and makes the common
+/// "the whole 16x16 tile" case a named constant instead of four magic numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Area {
+    /// Left edge.
+    pub x0: i32,
+    /// Top edge.
+    pub y0: i32,
+    /// Right edge, inclusive.
+    pub x1: i32,
+    /// Bottom edge, inclusive.
+    pub y1: i32,
+}
+
+impl Area {
+    /// A rectangle from its inclusive corners.
+    #[must_use]
+    pub const fn new(x0: i32, y0: i32, x1: i32, y1: i32) -> Self {
+        Self { x0, y0, x1, y1 }
+    }
+}
+
+/// The area of one 16x16 tile, the size nearly every ground and building tile
+/// is drawn at.
+pub const TILE: Area = Area::new(0, 0, 15, 15);
+
 /// Fills an inclusive rectangle, clipped to the image.
-pub fn fill(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: Color8) {
-    let (fx0, fx1) = if x0 <= x1 { (x0, x1) } else { (x1, x0) };
-    let (fy0, fy1) = if y0 <= y1 { (y0, y1) } else { (y1, y0) };
-    for y in fy0..=fy1 {
-        for x in fx0..=fx1 {
+pub fn fill(img: &mut Image, area: Area, color: Color8) {
+    let (x0, x1) = ordered(area.x0, area.x1);
+    let (y0, y1) = ordered(area.y0, area.y1);
+    for y in y0..=y1 {
+        for x in x0..=x1 {
             put(img, x, y, color);
         }
     }
 }
 
 /// Draws an inclusive one-pixel rectangle outline, clipped to the image.
-pub fn frame(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: Color8) {
-    hline(img, x0, x1, y0, color);
-    hline(img, x0, x1, y1, color);
-    vline(img, x0, y0, y1, color);
-    vline(img, x1, y0, y1, color);
+pub fn frame(img: &mut Image, area: Area, color: Color8) {
+    hline(img, area.x0, area.x1, area.y0, color);
+    hline(img, area.x0, area.x1, area.y1, color);
+    vline(img, area.x0, area.y0, area.y1, color);
+    vline(img, area.x1, area.y0, area.y1, color);
 }
 
-/// Scatters `color` across an inclusive rectangle: `percent` percent of the
-/// pixels receive it, chosen by hash.
-pub fn scatter(
-    img: &mut Image,
-    x0: i32,
-    y0: i32,
-    x1: i32,
-    y1: i32,
-    color: Color8,
-    percent: u64,
-    seed: u64,
-) {
-    for y in y0..=y1 {
-        for x in x0..=x1 {
+/// Scatters `color` across an area: `percent` percent of the pixels receive it,
+/// chosen by hash.
+pub fn scatter(img: &mut Image, area: Area, color: Color8, percent: u64, seed: u64) {
+    for y in area.y0..=area.y1 {
+        for x in area.x0..=area.x1 {
             if chance(x, y, seed, percent) {
                 put(img, x, y, color);
             }
@@ -101,11 +126,16 @@ pub fn scatter(
     }
 }
 
+/// The two ends of a span, smaller first.
+fn ordered(a: i32, b: i32) -> (i32, i32) {
+    if a <= b { (a, b) } else { (b, a) }
+}
+
 /// A 2x2 checkerboard dither blended with a hash, so it does not read as a
 /// perfect grid: two out of every three checker pixels are taken.
-pub fn dither(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: Color8, seed: u64) {
-    for y in y0..=y1 {
-        for x in x0..=x1 {
+pub fn dither(img: &mut Image, area: Area, color: Color8, seed: u64) {
+    for y in area.y0..=area.y1 {
+        for x in area.x0..=area.x1 {
             if (x + y).rem_euclid(2) == 0 && hash01(x, y, seed) < 0.7 {
                 put(img, x, y, color);
             }

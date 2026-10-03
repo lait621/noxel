@@ -185,26 +185,20 @@ fn a_chunk_is_a_pure_function_of_seed_and_position() {
 #[test]
 fn neighbouring_chunks_generate_in_any_order() {
     let g = generator(5);
-    let order_a = [
+    let positions = [
         ChunkPos::new(3, 4),
         ChunkPos::new(4, 4),
         ChunkPos::new(3, 5),
     ];
-    let order_b = [
-        ChunkPos::new(3, 5),
-        ChunkPos::new(3, 4),
-        ChunkPos::new(4, 4),
-    ];
-    let first: Vec<Vec<u8>> = order_a
-        .iter()
-        .map(|p| chunk_bytes(&g.generate_chunk(*p)))
-        .collect();
-    let second: Vec<Vec<u8>> = order_b
-        .iter()
-        .map(|p| chunk_bytes(&g.generate_chunk(*p)))
-        .collect();
-    for (a, b) in first.iter().zip(second.iter()) {
-        assert_eq!(a, b);
+    let order_a = [positions[0], positions[1], positions[2]];
+    let order_b = [positions[2], positions[0], positions[1]];
+    let mut first = std::collections::HashMap::new();
+    for pos in order_a {
+        first.insert(pos, fingerprint(&g.generate_chunk(pos)));
+    }
+    for pos in order_b {
+        let again = fingerprint(&g.generate_chunk(pos));
+        assert_eq!(first[&pos], again, "chunk {pos:?} changed with visit order");
     }
 }
 
@@ -215,13 +209,27 @@ fn different_seeds_generate_different_worlds() {
     let pos = ChunkPos::new(4, -4);
     let ca = a.generate_chunk(pos);
     let cb = b.generate_chunk(pos);
-    assert_ne!(ca.heights, cb.heights);
-    assert_ne!(ca.tiles, cb.tiles);
+    assert_ne!(
+        chunk_bytes(&ca),
+        chunk_bytes(&cb),
+        "two seeds produced the same chunk"
+    );
     assert_ne!(
         a.sample_height(10.0, 10.0),
         b.sample_height(10.0, 10.0),
         "heights must depend on the seed"
     );
+    let mut differing = 0;
+    for i in -3..3 {
+        for j in -3..3 {
+            if a.sample_height(i as f32 * 37.0, j as f32 * 37.0)
+                != b.sample_height(i as f32 * 37.0, j as f32 * 37.0)
+            {
+                differing += 1;
+            }
+        }
+    }
+    assert!(differing > 30, "only {differing}/36 samples differed");
 }
 
 #[test]
@@ -503,9 +511,10 @@ fn the_macro_lattice_is_connected_through_its_junctions() {
 fn lattice_junctions_are_shared_between_two_roads() {
     let g = generator(13);
     let config = g.config();
-    let net = RoadNetwork::generate(config, ChunkPos::new(-3, -3), ChunkPos::new(3, 3));
-    for i in -3..=3 {
-        for j in -3..=3 {
+    // A region of ±8 chunks is crossed by lattice lines -2..=2.
+    let net = RoadNetwork::generate(config, ChunkPos::new(-8, -8), ChunkPos::new(8, 8));
+    for i in -2..=2 {
+        for j in -2..=2 {
             let x = noxel_world::road::macro_line_x(config, i);
             let z = noxel_world::road::macro_line_z(config, j);
             let junction = Vec3::new(x, 0.0, z);
@@ -759,16 +768,23 @@ fn a_town_survives_an_empty_prefab_library() {
     let g = WorldGenerator::new(WorldConfig::new(73), rich_tile_set(), Vec::new());
     let spacing = g.config().town_spacing_chunks;
     let cell = ChunkPos::new(spacing, 0);
-    let chunk = g.generate_chunk(cell);
-    assert!(chunk.has_town);
-    assert!(
-        !chunk.buildings.is_empty(),
-        "the fallback house must appear"
-    );
-    for building in &chunk.buildings {
+    let plan = g.town_at(cell).expect("a town exists even with no prefabs");
+    let buildings = plan.instantiate(g.config(), &[], |x, z| g.sample_height(x, z));
+    assert!(!buildings.is_empty(), "the fallback house must appear");
+    for building in &buildings {
         assert_eq!(building.prefab, noxel_world::town::PROCEDURAL_PREFAB);
-        assert_eq!(building.occluders.len(), 2);
+        assert_eq!(building.occluders.len(), 2, "a wall run and a roof");
+        assert!(building.bounds.is_finite());
     }
+    // And the town's chunks carry them.
+    let mut found = 0;
+    for dy in -spacing..=spacing {
+        for dx in -spacing..=spacing {
+            let chunk = g.generate_chunk(ChunkPos::new(cell.x + dx, cell.y + dy));
+            found += chunk.buildings.len();
+        }
+    }
+    assert!(found > 0, "no chunk carries the town's buildings");
 }
 
 #[test]
@@ -1029,8 +1045,8 @@ fn colliders_in_agrees_with_a_brute_force_scan() {
     streamer.colliders_in(region, &mut fast);
 
     assert!(!brute.is_empty(), "the town chunk has no colliders");
-    brute.sort_by(|a, b| a.1.cmp(&b.1));
-    fast.sort_by(|a, b| a.1.cmp(&b.1));
+    brute.sort_by_key(|entry| entry.1);
+    fast.sort_by_key(|entry| entry.1);
     assert_eq!(fast, brute);
 }
 
@@ -1165,8 +1181,15 @@ fn chunk_to_string_is_stable_and_diffable() {
     assert!(first.contains("\ntiles\n"));
     assert!(first.contains("\nheights\n"));
     let lines: Vec<&str> = first.lines().collect();
-    let body: Vec<&&str> = lines.iter().filter(|l| l.len() == 32).collect();
-    assert_eq!(body.len(), 64, "32 tile rows plus 32 height rows");
+    let tile_rows = lines.iter().filter(|l| l.chars().count() == 32).count();
+    assert_eq!(tile_rows, 32, "one tile row per chunk row");
+    let heights = lines.iter().position(|l| *l == "heights").unwrap();
+    assert_eq!(
+        lines[heights + 1].split_whitespace().count(),
+        32,
+        "one height column per tile column"
+    );
+    assert!(lines[heights + 1].starts_with(' '), "heights are aligned");
 }
 
 #[test]
@@ -1207,4 +1230,44 @@ fn town_plans_are_usable_without_the_generator() {
     let free = plan.free_plots().count();
     let taken = plan.building_plots.iter().filter(|p| p.taken).count();
     assert_eq!(free + taken, plan.building_plots.len());
+}
+
+#[test]
+fn generation_is_fast_enough_to_stream() {
+    let g = generator(191);
+    let start = std::time::Instant::now();
+    let mut tiles = 0;
+    for i in -2..3 {
+        for j in -2..3 {
+            tiles += g.generate_chunk(ChunkPos::new(i, j)).tiles.len();
+        }
+    }
+    let elapsed = start.elapsed().as_secs_f32() * 1000.0;
+    let per_chunk = elapsed / 25.0;
+    println!("25 chunks in {elapsed:.1} ms ({per_chunk:.2} ms/chunk, {tiles} tiles)");
+    // A generous budget: a debug build on a slow machine is several times slower
+    // than a release build, and streaming generates a few chunks per frame.
+    assert!(per_chunk < 40.0, "{per_chunk:.2} ms per chunk is too slow");
+    let stats = g.stats();
+    assert_eq!(stats.chunks_generated, 25);
+    assert_eq!(stats.tiles_written, 25 * 32 * 32);
+    assert!(stats.last_ms >= 0.0);
+    assert!(
+        stats.mean_ms > 0.0 && stats.mean_ms < 40.0,
+        "{}",
+        stats.mean_ms
+    );
+    assert!(stats.props_placed + stats.buildings_placed + stats.roads_carved > 0);
+}
+
+#[test]
+fn a_full_view_streams_in_one_budget() {
+    let mut streamer = WorldStreamer::new(generator(193));
+    let start = std::time::Instant::now();
+    let stats = streamer.update(Vec3::ZERO);
+    let elapsed = start.elapsed().as_secs_f32() * 1000.0;
+    println!("{stats:?} in {elapsed:.1} ms");
+    assert_eq!(stats.generated_this_update, 169);
+    assert!(elapsed < 5_000.0, "streaming a full view took {elapsed} ms");
+    assert!(stats.last_update_ms <= elapsed + 1.0);
 }

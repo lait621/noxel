@@ -484,7 +484,7 @@ impl TownPlan {
             }
             let origin = Vec3::new(
                 plot.position.x + ts * 0.5,
-                plot_ground(&plot, ts, &ground),
+                plot_ground(plot, ts, &ground),
                 plot.position.z + ts * 0.5,
             );
             match fitting_prefab(prefabs, plot.facing, plot.size_tiles) {
@@ -552,7 +552,7 @@ pub fn nearest_town_cell(config: &WorldConfig, x: f32, z: f32) -> ChunkPos {
     } else {
         0
     };
-    ChunkPos::new(i * spacing, j * spacing)
+    ChunkPos::new(i.saturating_mul(spacing), j.saturating_mul(spacing))
 }
 
 /// The world-space centre of a town's lattice cell, on the ground plane.
@@ -594,11 +594,11 @@ pub fn town_streets(config: &WorldConfig, cell: ChunkPos) -> Vec<RoadSegment> {
 
 /// A prefab that fits a plot of `plot_size` tiles with the given facing.
 #[must_use]
-fn fitting_prefab<'a>(
-    prefabs: &'a [Arc<Prefab>],
+fn fitting_prefab(
+    prefabs: &[Arc<Prefab>],
     facing: Facing,
     plot_size: (u32, u32),
-) -> Option<&'a Arc<Prefab>> {
+) -> Option<&Arc<Prefab>> {
     let inner = (
         plot_size.0.saturating_sub(1).max(1),
         plot_size.1.saturating_sub(1).max(1),
@@ -854,11 +854,7 @@ pub fn merge_voxel_runs(voxels: &[PrefabVoxel]) -> Vec<[u8; 6]> {
         let z0 = base[2];
         let mut z1 = base[5];
         // Grow along +X.
-        loop {
-            let nx = match x1.checked_add(1) {
-                Some(v) => v,
-                None => break,
-            };
+        while let Some(nx) = x1.checked_add(1) {
             match find_run(&runs, &used, [nx, base[1], z0, nx, base[4], z0]) {
                 Some(j) => {
                     used[j] = true;
@@ -868,11 +864,7 @@ pub fn merge_voxel_runs(voxels: &[PrefabVoxel]) -> Vec<[u8; 6]> {
             }
         }
         // Grow along +Z, requiring the whole X span to be free.
-        'grow_z: loop {
-            let nz = match z1.checked_add(1) {
-                Some(v) => v,
-                None => break,
-            };
+        'grow_z: while let Some(nz) = z1.checked_add(1) {
             let mut found = Vec::new();
             for x in x0..=x1 {
                 match find_run(&runs, &used, [x, base[1], nz, x, base[4], nz]) {

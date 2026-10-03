@@ -14,7 +14,6 @@ use noxel_asset::json::JsonValue;
 use noxel_asset::png;
 
 use crate::error::{Error, Result};
-use crate::prefabs::NAMES as PREFAB_NAMES;
 use crate::{buildings, characters, palette, prefabs, props, sprites, terrain, tilesets, world};
 
 /// The manifest's file name, relative to the asset root.
@@ -68,14 +67,12 @@ pub struct VerifySummary {
 
 /// Builds every asset in memory, in write order.
 pub fn build(seed: u64) -> Result<Vec<AssetFile>> {
-    let mut files = Vec::new();
-
     // 1. The palette everything else is drawn from.
-    files.push(AssetFile {
+    let mut files = vec![AssetFile {
         path: "config/palette.json".to_string(),
         kind: "palette",
         bytes: json_bytes(&palette::file().to_json()),
-    });
+    }];
 
     // 2. The textures. Every pixel is checked against the palette as it is
     //    encoded: the pixel-art guarantee is enforced here, not only in tests.
@@ -130,26 +127,32 @@ pub fn build(seed: u64) -> Result<Vec<AssetFile>> {
         bytes: world::readme().into_bytes(),
     });
 
-    // 7. The directory guide.
+    // 7. The directory guide. It is written last of the text assets because it
+    //    quotes the size of the set, and the manifest is the only file after
+    //    it.
     files.push(AssetFile {
         path: "README.md".to_string(),
         kind: "doc",
-        bytes: readme().into_bytes(),
+        bytes: readme(files.len() + 2).into_bytes(),
     });
 
     // 8. The manifest, which lists everything above *and itself*, so that the
     //    file list in the asset tree and the file list in the manifest are the
-    //    same set by construction.
+    //    same set by construction. The index is sorted by path for reading; the
+    //    engine's typed lists keep generation order, which puts the terrain set
+    //    before the building set — and that order is load-bearing, because a
+    //    consumer that loads one tile set takes the first that parses.
     let mut entries: Vec<(String, &'static str)> = files
         .iter()
         .map(|file| (file.path.clone(), file.kind))
         .collect();
     entries.push((MANIFEST.to_string(), "manifest"));
-    entries.sort();
+    let mut index = entries.clone();
+    index.sort();
     files.push(AssetFile {
         path: MANIFEST.to_string(),
         kind: "manifest",
-        bytes: json_bytes(&manifest(&entries)),
+        bytes: json_bytes(&manifest(&entries, &index)),
     });
 
     Ok(files)
@@ -217,7 +220,6 @@ pub fn verify(out: &Path, seed: u64) -> Result<VerifySummary> {
 /// `verify` has no `--seed` flag: a world generated with a custom seed must
 /// still verify against itself, so the seed is recovered from the world it
 /// describes and only falls back to the default when there is nothing to read.
-#[must_use]
 pub fn seed_from_disk(out: &Path) -> Option<u64> {
     let bytes = std::fs::read(out.join("world/demo.json")).ok()?;
     let json = noxel_asset::json::parse(&bytes).ok()?;
@@ -230,7 +232,6 @@ pub fn seed_from_disk(out: &Path) -> Option<u64> {
 }
 
 /// The `list` report: every file, its kind and its size.
-#[must_use]
 pub fn listing(seed: u64) -> Result<String> {
     let files = build(seed)?;
     let total: usize = files.iter().map(|file| file.bytes.len()).sum();
@@ -275,11 +276,11 @@ fn json_bytes(value: &JsonValue) -> Vec<u8> {
     text.into_bytes()
 }
 
-/// Builds the manifest: the engine's [`AssetManifest`] lists plus the complete
-/// file index.
-fn manifest(entries: &[(String, &'static str)]) -> JsonValue {
+/// Builds the manifest: the engine's [`AssetManifest`] lists, in generation
+/// order, plus the complete file index sorted by path.
+fn manifest(ordered: &[(String, &'static str)], index: &[(String, &'static str)]) -> JsonValue {
     let collect = |kind: &str| -> Vec<String> {
-        entries
+        ordered
             .iter()
             .filter(|(_, entry_kind)| *entry_kind == kind)
             .map(|(path, _)| path.clone())
@@ -295,7 +296,7 @@ fn manifest(entries: &[(String, &'static str)]) -> JsonValue {
     };
 
     let files = JsonValue::Array(
-        entries
+        index
             .iter()
             .map(|(path, kind)| {
                 JsonValue::object([
@@ -315,9 +316,10 @@ fn manifest(entries: &[(String, &'static str)]) -> JsonValue {
     }
 }
 
-/// The text of `assets/README.md`.
+/// The text of `assets/README.md`, which describes `files` generated files in
+/// total (the README and the manifest included).
 #[must_use]
-pub fn readme() -> String {
+pub fn readme(files: usize) -> String {
     let mut text = String::new();
     text.push_str(
         "# Noxel demo assets\n\n\
@@ -415,10 +417,11 @@ pub fn readme() -> String {
     }
 
     text.push_str(&format!(
-        "\n## Files\n\n{} generated files. The manifest at `manifest.json` lists every one\n\
-         of them with its kind, including the manifest itself; the prefab order above is\n\
-         the order in `manifest.json`.\n",
-        PREFAB_NAMES.len()
+        "\n## Files\n\n{files} generated files, all of them listed in `manifest.json` with\n\
+         their kind — the manifest lists itself too, so the manifest and the directory\n\
+         hold the same set. The one file that is *not* an asset is `preview.png`: it is\n\
+         a contact sheet written on demand by `noxel-gen preview` for eyeballing the\n\
+         art, and it is deliberately kept out of the manifest.\n"
     ));
 
     text

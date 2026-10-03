@@ -239,6 +239,11 @@ impl DebugSystem {
         self.dumper.as_ref()
     }
 
+    /// The frame dumper, mutably — for clearing a previous run's output.
+    pub fn dumper_mut(&mut self) -> Option<&mut FrameDumper> {
+        self.dumper.as_mut()
+    }
+
     /// Attaches a frame dumper.
     pub fn set_dumper(&mut self, dumper: Option<FrameDumper>) {
         self.dumper = dumper;

@@ -9,16 +9,17 @@
 use std::collections::HashMap;
 
 use noxel_app::App;
-use noxel_core::math::{Color, Transform, Vec3};
+use noxel_core::math::{Color, Quat, Transform, Vec3};
 use noxel_npc::{CrowdTier, NpcConfig, NpcContext, NpcKind, NpcSystem};
-use noxel_physics::{
-    BodyDesc, BodyHandle, Capsule, CharacterMove, ColliderShape, LAYER_NPC, LAYER_PLAYER,
-};
+use noxel_physics::{BodyDesc, BodyHandle, ColliderShape, LAYER_ALL, LAYER_PLAYER};
 use noxel_render::material::Material;
 use noxel_render::mesh::Mesh;
 use noxel_render::scene::InstanceHandle;
 
 use crate::terrain::TerrainPlugin;
+
+/// Half the player capsule's total height, in metres.
+const PLAYER_HALF_HEIGHT: f32 = 0.85;
 
 /// The player's simulated state.
 #[derive(Clone, Debug)]
@@ -34,6 +35,11 @@ pub struct Player {
     /// Facing, radians (ADR 0001: yaw 0 looks along `-Z`).
     pub yaw: f32,
     /// Vertical velocity, for jumping.
+    ///
+    /// Unused by the demo's scripted walk — it exists because a game built on
+    /// this module will want it, and because a jump is the first thing anyone
+    /// adds.
+    #[allow(dead_code)]
     pub vertical_velocity: f32,
     /// True when the character is standing on ground.
     pub grounded: bool,
@@ -51,6 +57,7 @@ impl Player {
 
     /// The forward direction implied by the yaw.
     #[must_use]
+    #[allow(dead_code)]
     pub fn forward(&self) -> Vec3 {
         Vec3::new(-self.yaw.sin(), 0.0, -self.yaw.cos())
     }
@@ -103,7 +110,10 @@ impl PlayerPlugin {
 
     /// Places the player at a world position.
     pub fn spawn_at(&mut self, app: &mut App, position: Vec3, yaw: f32) {
-        let mesh = app.scene_mut().add_mesh(Mesh::capsule(0.35, 1.7, 12));
+        // A cylinder rather than a true capsule: at a 320x180 internal
+        // resolution the rounded caps are a couple of pixels, and the cylinder
+        // costs a third of the triangles.
+        let mesh = app.scene_mut().add_mesh(Mesh::cylinder(0.35, 1.7, 12));
         let material = app
             .scene_mut()
             .add_material(Material::lit("player", Color::rgb(0.92, 0.86, 0.72)));
@@ -114,11 +124,15 @@ impl PlayerPlugin {
             Transform::from_translation(position),
         );
 
+        // Kinematic, because the player is moved by the character controller
+        // rather than by the solver: it must push crates, not be pushed by them.
         let body = app.physics_mut().insert(
-            BodyDesc::kinematic()
-                .with_shape(ColliderShape::Capsule(Capsule::new(0.35, 1.0)))
-                .with_position(position)
-                .with_layer(LAYER_PLAYER),
+            BodyDesc::kinematic(ColliderShape::Capsule {
+                radius: 0.35,
+                half_height: 0.5,
+            })
+            .at(position)
+            .with_layer(LAYER_PLAYER, LAYER_ALL),
         );
 
         self.player = Some(Player {
@@ -135,12 +149,14 @@ impl PlayerPlugin {
 
     /// The player, if one exists.
     #[must_use]
+    #[allow(dead_code)]
     pub fn player(&self) -> Option<&Player> {
         self.player.as_ref()
     }
 
     /// The current target, or `None` when the route is empty.
     #[must_use]
+    #[allow(dead_code)]
     pub fn target(&self) -> Option<Vec3> {
         self.route.get(self.route_cursor).map(|w| w.position)
     }
@@ -158,17 +174,37 @@ impl PlayerPlugin {
         self.pause_timer = self.route[self.route_cursor].pause;
     }
 
+    /// True once the streamer has enough of the world to place anything.
+    #[must_use]
+    fn world_ready(app: &App) -> bool {
+        app.context.streamer.stats().loaded > 0
+    }
+
     /// One fixed step of player movement.
     pub fn update(&mut self, app: &mut App, dt: f32, scripted: bool) {
-        let Some(player) = self.player.as_mut() else {
-            return;
-        };
+        // The very first steps run before the streamer has loaded anything, so
+        // the player has to wait for the world rather than spawn into a void.
+        if self.player.is_none() {
+            if !Self::world_ready(app) {
+                return;
+            }
+            self.spawn_at(app, Vec3::ZERO, 0.0);
+            self.build_route(app, Vec3::ZERO, 14.0, 10);
+        }
 
-        // ---- decide where to go ------------------------------------------
+        // ---- decide where to go -------------------------------------------
+        // Read the route before borrowing the player: both are fields of `self`,
+        // but the borrow checker cannot see through a method call.
+        let position = self
+            .player
+            .as_ref()
+            .map(|p| p.position)
+            .unwrap_or(Vec3::ZERO);
+        let yaw = self.player.as_ref().map(|p| p.yaw).unwrap_or(0.0);
         let desired = if scripted {
             match self.route.get(self.route_cursor) {
                 Some(waypoint) => {
-                    let delta = waypoint.position - player.position;
+                    let delta = waypoint.position - position;
                     let flat = Vec3::new(delta.x, 0.0, delta.z);
                     if flat.length() < 0.8 {
                         if self.pause_timer > 0.0 {
@@ -186,26 +222,36 @@ impl PlayerPlugin {
             }
         } else {
             // Free movement: the host fills `InputState`.
-            let (x, z) = app.context.input.movement_axis(82, 81, 80, 79); // WASD
-            // Screen-relative: pressing up walks away from the camera.
-            let forward = player.forward();
+            let (x, z) = app.context.input.movement_axis(87, 83, 65, 68); // W S A D
+            let forward = Vec3::new(-yaw.sin(), 0.0, -yaw.cos());
             let right = Vec3::new(-forward.z, 0.0, forward.x);
             (forward * -z + right * x).normalize_or_zero()
         };
 
+        let Some(player) = self.player.as_mut() else {
+            return;
+        };
         player.velocity = desired * self.speed;
         let motion = player.velocity * dt;
 
         // ---- move through the physics world -------------------------------
         let body = player.body;
-        let move_request = CharacterMove {
-            motion,
-            ..CharacterMove::default()
-        };
-        let result = app.physics_mut().move_character(body, &move_request);
+        let result = app.physics_mut().move_character(body, motion, Vec3::Y);
 
-        player.position = result.position;
+        player.position += result.translation;
         player.grounded = result.grounded;
+
+        // The terrain is a heightfield, not physics geometry: a chunk's
+        // colliders are its buildings and props, so `move_character` alone would
+        // let the player walk off into the sky. Snap to the ground the streamer
+        // reports, and treat the character controller's answer as the
+        // *obstacle* verdict rather than the ground one.
+        let ground = app.context.streamer.height_at(player.position);
+        let feet = ground + PLAYER_HALF_HEIGHT;
+        if player.position.y <= feet + 0.6 {
+            player.position.y = feet;
+            player.grounded = true;
+        }
         player.distance_travelled += Vec3::new(motion.x, 0.0, motion.z).length();
         if desired.length_squared() > 1e-6 {
             // Turn towards the direction of travel with a short smoothing so the
@@ -218,10 +264,12 @@ impl PlayerPlugin {
         // ---- keep the ground under our feet -------------------------------
         app.physics_mut().set_position(body, player.position);
         let instance = player.instance;
-        app.scene_mut().set_transform(
-            instance,
-            Transform::from_translation(player.position).with_yaw(player.yaw),
+        let transform = Transform::new(
+            player.position + Vec3::Y * 0.85,
+            Quat::from_axis_angle(Vec3::Y, player.yaw),
+            Vec3::ONE,
         );
+        app.scene_mut().set_transform(instance, transform);
 
         app.context.focus = player.focus();
         app.debug_mut()
@@ -295,12 +343,14 @@ impl CrowdPlugin {
 
     /// The number of agents currently drawn.
     #[must_use]
+    #[allow(dead_code)]
     pub fn drawn(&self) -> usize {
         self.instances.len()
     }
 
     /// The crowd system.
     #[must_use]
+    #[allow(dead_code)]
     pub fn system(&self) -> &NpcSystem {
         &self.system
     }
@@ -310,14 +360,9 @@ impl CrowdPlugin {
         if self.populated {
             return;
         }
+        // Leave the actual placement to `maintain_population`: it knows which
+        // places are walkable and which kind suits them, and it is deterministic.
         let center = app.context.focus;
-        let mut crowd = self.system.crowd_mut();
-        let target = crowd.config().target_population;
-        for i in 0..target {
-            let _ = i;
-            crowd.spawn(NpcKind::Villager, center);
-        }
-        drop(crowd);
         self.system.maintain_population(&mut NpcContext {
             streamer: &app.context.streamer,
             physics: &mut app.context.physics,
@@ -352,25 +397,31 @@ impl CrowdPlugin {
     fn sync_scene(&mut self, app: &mut App) {
         let mesh = *self
             .mesh
-            .get_or_insert_with(|| app.scene_mut().add_mesh(Mesh::capsule(0.3, 1.5, 8)));
+            .get_or_insert_with(|| app.scene_mut().add_mesh(Mesh::cylinder(0.3, 1.5, 8)));
         let mut alive: Vec<u32> = Vec::with_capacity(self.instances.len() + 16);
 
-        for agent in self.system.crowd().iter() {
-            let index = agent.id.index() as u32;
+        // Snapshot the agents first: `self.system` is borrowed immutably for the
+        // whole loop, and `self.instances` has to be mutable inside it.
+        let snapshot: Vec<(u32, NpcKind, CrowdTier, Vec3, f32)> = self
+            .system
+            .crowd()
+            .iter()
+            .map(|a| (a.id.index() as u32, a.kind, a.tier, a.position, a.yaw))
+            .collect();
+
+        for (index, kind, tier, position, yaw) in snapshot {
             alive.push(index);
-            let transform = Transform::from_translation(agent.position).with_yaw(agent.yaw);
-            match self.instances.get(&index) {
-                Some(handle) => {
-                    app.scene_mut().set_transform(*handle, transform);
-                }
-                None => {
-                    let material = self.material_for(app, agent.kind);
-                    let handle =
-                        app.scene_mut()
-                            .spawn(format!("npc_{index}"), mesh, material, transform);
-                    app.scene_mut().set_flags(handle, agent_flags(agent.tier));
-                    self.instances.insert(index, handle);
-                }
+            let transform =
+                Transform::new(position, Quat::from_axis_angle(Vec3::Y, yaw), Vec3::ONE);
+            if let Some(handle) = self.instances.get(&index).copied() {
+                app.scene_mut().set_transform(handle, transform);
+            } else {
+                let material = self.material_for(app, kind);
+                let handle =
+                    app.scene_mut()
+                        .spawn(format!("npc_{index}"), mesh, material, transform);
+                app.scene_mut().set_flags(handle, agent_flags(tier));
+                self.instances.insert(index, handle);
             }
         }
 
@@ -384,7 +435,7 @@ impl CrowdPlugin {
             .collect();
         for index in stale {
             if let Some(handle) = self.instances.remove(&index) {
-                app.scene_mut().despawn(handle);
+                app.scene_mut().remove_instance(handle);
             }
         }
     }
@@ -416,14 +467,16 @@ impl CrowdPlugin {
 /// 400 boxes into the camera-occlusion ray test.
 fn agent_flags(tier: CrowdTier) -> noxel_render::scene::InstanceFlags {
     let mut flags = noxel_render::scene::InstanceFlags::character();
-    if tier != CrowdTier::Near {
-        flags.occluder = false;
-    }
+    // Only the near tier is an occluder: a crowd of 400 would otherwise put 400
+    // boxes into the camera-occlusion ray test every frame, for characters that
+    // are too small on screen to hide anything.
+    flags.occluder = tier == CrowdTier::Near;
     flags
 }
 
 /// The HUD-facing summary of the crowd.
 #[must_use]
+#[allow(dead_code)]
 pub fn describe(plugin: &CrowdPlugin) -> String {
     let stats = plugin.system.stats();
     format!(
@@ -438,6 +491,70 @@ pub fn describe(plugin: &CrowdPlugin) -> String {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Plugin wiring
+// ---------------------------------------------------------------------------
+
+impl noxel_app::Plugin for PlayerPlugin {
+    fn name(&self) -> &str {
+        "player"
+    }
+
+    fn update(&mut self, app: &mut App, dt: f32) {
+        // Scripted by default: the demo has no window, so there is no input
+        // stream. A host that fills `app.input_mut()` can flip this.
+        self.update(app, dt, true);
+        if let Some(player) = self.player.as_ref() {
+            app.debug_mut()
+                .record_counter("grounded", f32::from(player.grounded));
+        }
+    }
+
+    fn draw(&mut self, app: &mut App, framebuffer: &mut noxel_render::Framebuffer) {
+        crate::hud::draw(app, framebuffer);
+        // Draws a box around anything currently fading, which is the only way to
+        // see *why* a roof went see-through in a still frame.
+        crate::hud::draw_occluders(app, framebuffer);
+    }
+
+    fn pre_cull(&mut self, app: &mut App, _dt: f32) {
+        // The camera has to be final before streaming and culling read it, and
+        // `PlayerPlugin::update` runs at the fixed rate, so the focus is set
+        // there; this hook exists to make the ordering explicit.
+        if let Some(player) = self.player.as_ref() {
+            app.context.focus = player.focus();
+        }
+    }
+}
+
+impl noxel_app::Plugin for CrowdPlugin {
+    fn name(&self) -> &str {
+        "crowd"
+    }
+
+    fn update(&mut self, app: &mut App, dt: f32) {
+        if !self.populated {
+            if app.context.streamer.stats().loaded == 0 {
+                return;
+            }
+            self.populate(app);
+        }
+        self.update(app, dt, app.context.elapsed as f64);
+    }
+}
+
+impl noxel_app::Plugin for TerrainPlugin {
+    fn name(&self) -> &str {
+        "terrain"
+    }
+
+    fn frame(&mut self, app: &mut App, _dt: f32) {
+        // After `App::frame_update` has streamed the chunks around the camera,
+        // so the geometry matches what is resident this frame.
+        self.sync(app);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -450,7 +567,7 @@ mod tests {
     #[test]
     fn player_forward_matches_the_engine_convention() {
         let player = Player {
-            instance: InstanceHandle::default(),
+            instance: InstanceHandle::INVALID,
             body: BodyHandle::INVALID,
             position: Vec3::ZERO,
             velocity: Vec3::ZERO,
@@ -470,7 +587,7 @@ mod tests {
     #[test]
     fn focus_is_above_the_feet() {
         let player = Player {
-            instance: InstanceHandle::default(),
+            instance: InstanceHandle::INVALID,
             body: BodyHandle::INVALID,
             position: Vec3::ZERO,
             velocity: Vec3::ZERO,
@@ -523,7 +640,7 @@ mod tests {
         plugin.build_route(&app, Vec3::ZERO, 12.0, 8);
         assert_eq!(plugin.route.len(), 8);
         assert!(plugin.route.iter().all(|w| w.position.y.is_finite()));
-        let _ = app.frame_update(1.0 / 60.0);
+        app.frame_update(1.0 / 60.0);
     }
 
     #[test]

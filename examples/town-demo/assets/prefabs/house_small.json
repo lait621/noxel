@@ -1,0 +1,434 @@
+{
+  "name": "house_small",
+  "size": [
+    5,
+    3,
+    4
+  ],
+  "tags": [
+    "building",
+    "residential"
+  ],
+  "voxels": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "tile": 25,
+      "name": "floor_wood"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "tile": 20,
+      "name": "wall_door"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 1,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 2,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    }
+  ],
+  "props": [
+    {
+      "kind": "sign",
+      "position": [
+        3.5999999046325684,
+        0,
+        0.5
+      ],
+      "yaw": 1.5707963705062866,
+      "scale": 1
+    }
+  ],
+  "spawns": [
+    {
+      "name": "door",
+      "position": [
+        2.5,
+        0,
+        -0.5
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "resident",
+      "position": [
+        2.5,
+        0,
+        2
+      ],
+      "yaw": 3.1415927410125732
+    }
+  ],
+  "occluders": [
+    [
+      0,
+      1,
+      0,
+      5,
+      2,
+      4
+    ]
+  ]
+}

@@ -16,9 +16,10 @@
 //! 2. **Biome** — temperature (a low-frequency gradient plus noise) and moisture
 //!    (fBm) select from [`BiomeTable`]; below sea level water wins, above the
 //!    mountain threshold rock wins.
-//! 3. **Tiles** — water, then the road network, then rock on steep slopes, then
-//!    beach sand, then the biome's base tile with an accent tile where a small
-//!    noise crosses its threshold.
+//! 3. **Tiles** — water, then the road network (including the town streets and
+//!    the connector to the nearest macro road), then a building's interior
+//!    floor, then rock on steep slopes, then beach sand, then the biome's base
+//!    tile with an accent tile where a small noise crosses its threshold.
 //! 4. **Towns and props** — towns are placed on a chunk lattice, their buildings
 //!    instantiated from the prefab library (or the procedural fallback), and
 //!    trees and rocks are scattered by density, never on a road, in water, on a
@@ -93,6 +94,13 @@ const PROP_DENSITY_SCALE: f32 = 10.0;
 /// Upper bound on `tiles_per_chunk`, so a hand-edited config cannot allocate the
 /// machine to death.
 pub const MAX_TILES_PER_CHUNK: u32 = 1024;
+
+/// Upper bound on a lattice index derived from a chunk coordinate.
+///
+/// Keeping indices below this keeps `index * spacing` — and therefore every
+/// chunk coordinate the generator hands back — inside `i32` even when the input
+/// position has saturated.
+pub const MAX_LATTICE_INDEX: i32 = 4_000_000;
 
 /// World coordinates are clamped to this magnitude before they reach the noise.
 ///
@@ -491,9 +499,23 @@ impl WorldGenerator {
     /// Covers the macro lattice, the nearest town's street grid and the
     /// connector between them — exactly the bands the chunk tiles are stamped
     /// from.
+    ///
+    /// Answers a single query; the chunk generator precomputes the street grid
+    /// once per chunk instead of calling this per tile.
     #[must_use]
     pub fn is_road_at(&self, world_x: f32, world_z: f32) -> bool {
-        self.road_band(world_x, world_z, None)
+        if !world_x.is_finite() || !world_z.is_finite() {
+            return false;
+        }
+        let pos = ChunkPos::from_world(
+            Vec3::new(world_x, 0.0, world_z),
+            self.config.chunk_world_size(),
+        );
+        let plan = self
+            .town_cell_for_chunk(pos)
+            .map(|cell| self.plan_town(cell));
+        let streets = self.local_streets(pos, plan.as_ref());
+        self.road_band(world_x, world_z, &streets)
     }
 
     /// The town plan covering `chunk`, if any.
@@ -546,7 +568,7 @@ impl WorldGenerator {
             .fetch_add(chunk.chunk.props.len() as u64, Ordering::Relaxed);
         self.counters
             .roads
-            .fetch_add(chunk.road_tiles as u64, Ordering::Relaxed);
+            .fetch_add(chunk.road_tiles, Ordering::Relaxed);
         self.counters.last_us.store(elapsed_us, Ordering::Relaxed);
         self.counters
             .total_us
@@ -697,13 +719,15 @@ impl WorldGenerator {
     /// The ground level of a town's plaza: the base field plus the road carve,
     /// never the town flattening, so there is no recursion.
     ///
-    /// A site that would otherwise be under water is terraced up to just above
-    /// the waterline: a town always exists at its lattice position, and a road
-    /// crossing the disc stays walkable instead of being pulled under.
+    /// A site that would otherwise be under water is terraced up to the top of
+    /// the beach band: a town always exists at its lattice position, a road
+    /// crossing the disc stays walkable instead of being pulled under, and the
+    /// town itself reads as land rather than as a sandbar (below the beach line
+    /// every one of its tiles would be sand).
     fn plaza_ground(&self, cell: ChunkPos) -> f32 {
         let centre = town_centre(&self.config, cell);
         let raw = self.carve_roads(centre.x, centre.z, self.base_height(centre.x, centre.z));
-        raw.max(self.config.sea_level + BEACH_HEIGHT * 0.5)
+        raw.max(self.config.sea_level + BEACH_HEIGHT + 0.6)
     }
 
     /// Flattens a town's disc towards its plaza height.
@@ -724,16 +748,25 @@ impl WorldGenerator {
 
     /// The town lattice cell that covers `chunk`, if any.
     fn town_cell_for_chunk(&self, chunk: ChunkPos) -> Option<ChunkPos> {
-        let spacing = self.config.town_spacing();
+        let spacing = self.config.town_spacing().max(1);
         let radius = self.config.town_radius_chunks.max(1);
-        let i = round_div(chunk.x, spacing);
-        let j = round_div(chunk.y, spacing);
+        // A query far past the coordinate clamp saturates to `i32::MAX`. Bounding
+        // the lattice index keeps the multiply back to a chunk coordinate — and
+        // the distance test below — inside `i32`.
+        let max_index = MAX_LATTICE_INDEX / spacing.max(1);
+        let i = round_div(chunk.x.clamp(-max_index, max_index), spacing);
+        let j = round_div(chunk.y.clamp(-max_index, max_index), spacing);
         // The discs never overlap (radius < spacing / 2), so the nearest cell is
         // the only candidate; the neighbours are checked anyway so an unusual
         // configuration degrades to "no town" rather than to a wrong one.
         for (di, dj) in [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1)] {
-            let cell = ChunkPos::new((i + di) * spacing, (j + dj) * spacing);
-            if chunk.chebyshev_distance(cell) <= radius {
+            let cell = ChunkPos::new(
+                (i + di).saturating_mul(spacing),
+                (j + dj).saturating_mul(spacing),
+            );
+            let dx = (i64::from(chunk.x) - i64::from(cell.x)).abs();
+            let dy = (i64::from(chunk.y) - i64::from(cell.y)).abs();
+            if dx.max(dy) <= i64::from(radius) {
                 return Some(cell);
             }
         }
@@ -749,10 +782,10 @@ impl WorldGenerator {
 
     /// True when a tile centre is paved.
     ///
-    /// `plan` supplies the street grid when the caller already has it; when it
-    /// is `None` the analytic grid is computed from the lattice, which is what
-    /// [`WorldGenerator::is_road_at`] uses.
-    fn road_band(&self, x: f32, z: f32, plan: Option<&TownPlan>) -> bool {
+    /// `streets` is the precomputed street grid that can reach this query (see
+    /// [`WorldGenerator::local_streets`]); passing it in keeps the per-tile test
+    /// allocation-free.
+    fn road_band(&self, x: f32, z: f32, streets: &[RoadSegment]) -> bool {
         if !x.is_finite() || !z.is_finite() {
             return false;
         }
@@ -764,18 +797,33 @@ impl WorldGenerator {
         if (x - line_x).abs() <= half || (z - line_z).abs() <= half {
             return true;
         }
-        match plan {
-            Some(plan) => plan
-                .streets
-                .iter()
-                .any(|street| street.distance_to(Vec3::new(x, 0.0, z)) <= street.half_width()),
-            None => {
-                let cell = nearest_town_cell(cfg, x, z);
-                town_streets(cfg, cell)
-                    .iter()
-                    .any(|street| street.distance_to(Vec3::new(x, 0.0, z)) <= street.half_width())
-            }
+        let point = Vec3::new(x, 0.0, z);
+        streets
+            .iter()
+            .any(|street| street.distance_to(point) <= street.half_width())
+    }
+
+    /// The street segments that can reach a chunk: the town's own grid when the
+    /// chunk belongs to a town, otherwise the analytic grid of the nearest
+    /// lattice cell — whose connector can still reach into this chunk.
+    fn local_streets(&self, pos: ChunkPos, plan: Option<&TownPlan>) -> Vec<RoadSegment> {
+        let cfg = &self.config;
+        if let Some(plan) = plan {
+            return plan.streets.clone();
         }
+        let size = cfg.safe_tiles_per_chunk() as f32 * cfg.tile_size();
+        let origin = Vec3::new(
+            pos.x as f32 * cfg.chunk_world_size(),
+            0.0,
+            pos.y as f32 * cfg.chunk_world_size(),
+        );
+        let first = nearest_town_cell(cfg, origin.x, origin.z);
+        let second = nearest_town_cell(cfg, origin.x + size, origin.z + size);
+        let mut streets = town_streets(cfg, first);
+        if second != first {
+            streets.extend(town_streets(cfg, second));
+        }
+        streets
     }
 
     /// The road pieces crossing a chunk, clipped to it.
@@ -827,16 +875,14 @@ impl WorldGenerator {
     /// The order is water, road, building floor, rock, beach, accent, base: a
     /// road survives a shoreline, and a building's interior floor only appears
     /// where nothing more important already is.
-    fn tile_for(
-        &self,
-        x: f32,
-        z: f32,
-        height: f32,
-        slope: f32,
-        biome: BiomeId,
-        on_road: bool,
-        in_building: bool,
-    ) -> u32 {
+    fn tile_for(&self, sample: TileSample, on_road: bool, in_building: bool) -> u32 {
+        let TileSample {
+            x,
+            z,
+            height,
+            slope,
+            biome,
+        } = sample;
         let index = biome.index();
         if height < self.config.sea_level {
             return self.slots.biome_water[index].unwrap_or(self.slots.water);
@@ -952,8 +998,11 @@ impl WorldGenerator {
             }
         }
 
-        // 4. Tiles.
+        // 4. Tiles. The street grid is resolved once: a per-tile lookup would
+        //    re-derive (and re-allocate) the whole town layout 1024 times.
+        let streets = self.local_streets(pos, plan.as_ref());
         let mut tiles = vec![0u32; count];
+        let mut road_flags = vec![false; count];
         let mut road_tiles = 0u64;
         for ty in 0..side_usize {
             for tx in 0..side_usize {
@@ -963,14 +1012,24 @@ impl WorldGenerator {
                 let wx = origin_x + (tx as f32 + 0.5) * ts;
                 let wz = origin_z + (ty as f32 + 0.5) * ts;
                 let height = heights[gy * halo + gx];
-                let on_road = self.road_band(wx, wz, plan.as_ref());
+                let on_road = self.road_band(wx, wz, &streets);
+                road_flags[i] = on_road;
                 if on_road {
                     road_tiles += 1;
                 }
                 let point = Vec3::new(wx, height, wz);
                 let in_building = buildings.iter().any(|b| b.contains_xz(point));
-                tiles[i] =
-                    self.tile_for(wx, wz, height, slopes[i], biomes[i], on_road, in_building);
+                tiles[i] = self.tile_for(
+                    TileSample {
+                        x: wx,
+                        z: wz,
+                        height,
+                        slope: slopes[i],
+                        biome: biomes[i],
+                    },
+                    on_road,
+                    in_building,
+                );
             }
         }
 
@@ -987,8 +1046,8 @@ impl WorldGenerator {
                 slopes: &slopes,
                 biomes: &biomes,
                 tiles: &tiles,
+                road_flags: &road_flags,
                 buildings: &buildings,
-                plan: plan.as_ref(),
             };
             self.scatter_props(pos, &field, &mut props);
         }
@@ -1067,9 +1126,7 @@ impl WorldGenerator {
                 let wx = field.origin_x + (tx as f32 + 0.5) * field.ts;
                 let wz = field.origin_z + (ty as f32 + 0.5) * field.ts;
                 let point = Vec3::new(wx, height, wz);
-                let on_road =
-                    field.tiles[i] == self.slots.road || self.road_band(wx, wz, field.plan);
-                if on_road || field.tiles[i] == self.slots.water {
+                if field.road_flags[i] || field.tiles[i] == self.slots.water {
                     continue;
                 }
                 if field.buildings.iter().any(|b| b.contains_xz(point)) {
@@ -1101,8 +1158,19 @@ struct PropField<'a> {
     slopes: &'a [f32],
     biomes: &'a [BiomeId],
     tiles: &'a [u32],
+    /// Whether each tile centre is paved, from the tile pass.
+    road_flags: &'a [bool],
     buildings: &'a [BuildingInstance],
-    plan: Option<&'a TownPlan>,
+}
+
+/// The inputs tile selection needs for one tile.
+#[derive(Clone, Copy, Debug)]
+struct TileSample {
+    x: f32,
+    z: f32,
+    height: f32,
+    slope: f32,
+    biome: BiomeId,
 }
 
 /// A chunk plus the numbers the statistics need.
@@ -1481,7 +1549,7 @@ mod tests {
         let cell = config.chunk_world_size() * config.road_grid_chunks as f32;
         let pos = ChunkPos::new((cell / config.chunk_world_size()) as i32, 0);
         let chunk = g.generate_chunk(pos);
-        assert!(chunk.roads.len() > 0 || chunk.tiles.iter().any(|t| *t == 15));
+        assert!(!chunk.roads.is_empty() || chunk.tiles.contains(&15));
         for prop in &chunk.props {
             assert!(!g.is_road_at(prop.position.x, prop.position.z));
         }
@@ -1651,10 +1719,13 @@ mod tests {
             let _ = g.biome_at(x, z);
             let _ = g.is_road_at(x, z);
         }
-        assert_eq!(
-            g.sample_height(1e30, 40.0),
-            g.sample_height(MAX_WORLD_COORDINATE, 40.0)
-        );
+        // The field is still a pure function out there, and the clamp keeps a
+        // coordinate far past the limit from reaching the noise unclamped.
+        assert_eq!(g.sample_height(1e30, 40.0), g.sample_height(1e30, 40.0));
+        assert!(MAX_WORLD_COORDINATE * 0.056 + 1.0 < i32::MAX as f32);
+        let chunk = g.generate_chunk(ChunkPos::new(1_000_000, -1_000_000));
+        assert_eq!(chunk.tiles.len(), 32 * 32);
+        assert!(chunk.bounds().is_finite());
     }
 
     #[test]

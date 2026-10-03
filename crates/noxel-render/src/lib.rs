@@ -49,6 +49,7 @@ pub use material::{
     AlphaMode, Material, MaterialHandle, MaterialLibrary, MeshHandle, TextureHandle,
 };
 pub use mesh::{Mesh, Vertex};
+pub use noxel_core::math::{Color, Color8};
 pub use overlay::{Font, Overlay};
 pub use raster::RasterRenderer;
 pub use raytrace::RayTracer;

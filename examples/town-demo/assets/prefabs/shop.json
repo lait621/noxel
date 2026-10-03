@@ -1,0 +1,659 @@
+{
+  "name": "shop",
+  "size": [
+    6,
+    3,
+    5
+  ],
+  "tags": [
+    "building",
+    "commercial"
+  ],
+  "voxels": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 0,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 1,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 2,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "tile": 26,
+      "name": "floor_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "tile": 18,
+      "name": "wall_stone"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "tile": 20,
+      "name": "wall_door"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 0,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 1,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 2,
+      "tile": 19,
+      "name": "wall_window"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 3,
+      "tile": 27,
+      "name": "counter"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 3,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 4,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 4,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 4,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 4,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 4,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 4,
+      "tile": 16,
+      "name": "wall_plaster"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 0,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 1,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 2,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 3,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 4,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 4,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 4,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 4,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 4,
+      "tile": 21,
+      "name": "roof_red"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 4,
+      "tile": 21,
+      "name": "roof_red"
+    }
+  ],
+  "props": [
+    {
+      "kind": "sign",
+      "position": [
+        2.5,
+        0,
+        0.4000000059604645
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "crate",
+      "position": [
+        5.400000095367432,
+        0,
+        4.400000095367432
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "kind": "barrel",
+      "position": [
+        0.4000000059604645,
+        0,
+        4.400000095367432
+      ],
+      "yaw": 0,
+      "scale": 1
+    }
+  ],
+  "spawns": [
+    {
+      "name": "door",
+      "position": [
+        2.5,
+        0,
+        -0.5
+      ],
+      "yaw": 0
+    },
+    {
+      "name": "shopkeeper",
+      "position": [
+        2.5,
+        0,
+        2.5
+      ],
+      "yaw": 3.1415927410125732
+    },
+    {
+      "name": "customer",
+      "position": [
+        1.5,
+        0,
+        4.199999809265137
+      ],
+      "yaw": 0
+    }
+  ],
+  "occluders": [
+    [
+      0,
+      1,
+      0,
+      6,
+      2,
+      5
+    ]
+  ]
+}

@@ -36,22 +36,23 @@
 //! * **A window.** Call `App::step` yourself and blit `app.resolve()` to the
 //!   surface. `docs/guides/windowing.md` has a worked `winit` example.
 //! * **Input.** Fill `app.input_mut()` from the host's events; the player plugin
-//!   already reads WASD when `--scripted` is off.
+//!   already reads WASD in `PlayerPlugin::update` when its `scripted` flag is
+//!   false; the demo leaves it on because there is no window to type into.
 
 mod actors;
 mod args;
 mod hud;
 mod terrain;
+mod village;
 
 use std::time::Instant;
 
 use actors::{CrowdPlugin, PlayerPlugin};
 use args::Args;
 use noxel_app::{App, AppConfig, DebugConfig};
-use noxel_core::math::Vec3;
+use noxel_core::math::{Color, Vec3};
 use noxel_npc::NpcConfig;
-use noxel_render::Color;
-use noxel_render::light::{Ambient, Falloff, Fog, Light};
+use noxel_render::light::{Ambient, Fog, Light};
 use noxel_render::renderer::ShadingMode;
 use noxel_world::WorldChunkPos;
 use terrain::TerrainPlugin;
@@ -88,7 +89,7 @@ fn run(args: &Args) -> Result<(), String> {
     let mut app = build_app(args)?;
 
     if args.world_info {
-        print_world_info(&app, args);
+        print_world_info(&mut app, args);
         return Ok(());
     }
 
@@ -151,7 +152,14 @@ fn build_app(args: &Args) -> Result<App, String> {
         internal: args.size,
         mode: args.mode,
         world: args.world_config(),
-        debug: DebugConfig::default(),
+        // The engine's statistics panel is opt-in here: the demo draws its own
+        // HUD, and a panel that covers two thirds of a 320x180 frame hides the
+        // thing the demo exists to show.
+        debug: if args.debug {
+            DebugConfig::default()
+        } else {
+            DebugConfig::disabled()
+        },
         assets_root: root,
         ..AppConfig::default()
     };
@@ -159,10 +167,14 @@ fn build_app(args: &Args) -> Result<App, String> {
         config.dump = Some((dir.clone(), noxel_debug::DumpFormat::Png));
     } else {
         config.dump = None;
-        config.debug = DebugConfig::minimal();
     }
 
     let mut app = App::new(config).map_err(|e| e.to_string())?;
+    // A previous run's frames would otherwise survive into this one and be
+    // mistaken for output.
+    if let Some(dumper) = app.debug_mut().dumper_mut() {
+        let _ = dumper.clear();
+    }
 
     // ---- lighting ---------------------------------------------------------
     // A low sun so the ray-traced AO and shadows have something to say, plus a
@@ -173,14 +185,35 @@ fn build_app(args: &Args) -> Result<App, String> {
         hemisphere: 0.7,
         intensity: 0.85,
     };
-    app.context.scene.add_light(
-        Light::sun()
-            .with_direction(Vec3::new(-0.42, -0.78, -0.46))
-            .with_intensity(0.85),
-    );
-    app.context.scene.fog = Some(Fog::linear(Color::rgb(0.66, 0.74, 0.86), 70.0, 160.0));
+    let mut sun = Light::sun();
+    if let Light::Directional {
+        direction,
+        intensity,
+        shadow_extent,
+        ..
+    } = &mut sun
+    {
+        *direction = Vec3::new(-0.42, -0.78, -0.46).normalize_or_zero();
+        *intensity = 0.85;
+        // A wide enough orthographic shadow volume to cover the visible village;
+        // too small and the shadows stop at an invisible wall.
+        *shadow_extent = 60.0;
+    }
+    app.context.scene.add_light(sun);
+    app.context.scene.fog = Some(Fog {
+        color: Color::rgb(0.66, 0.74, 0.86),
+        start: 70.0,
+        end: 160.0,
+        height_falloff: 0.0,
+    });
 
     // ---- camera -----------------------------------------------------------
+    // A true bird's-eye view shows the top of everyone's head. A 62-degree
+    // three-quarter view is what a top-down pixel RPG actually uses: characters
+    // read as characters, buildings show their walls, and the tile grid is still
+    // axis-aligned.
+    app.camera_mut().set_pitch(1.08);
+    app.camera_mut().set_distance(60.0);
     app.camera_mut().set_ortho_height(20.0);
     app.camera_mut().set_smoothing(0.02);
     app.camera_mut().set_deadzone(1.6, 1.2, 0.0);
@@ -228,8 +261,7 @@ fn describe_mode(mode: ShadingMode) -> &'static str {
 }
 
 /// Prints what this seed generates, without rendering anything.
-fn print_world_info(app: &App, args: &Args) {
-    let mut app = app;
+fn print_world_info(app: &mut App, args: &Args) {
     app.frame_update(FIXED_DT);
     let generator = app.context.streamer.generator();
     let config = generator.config();

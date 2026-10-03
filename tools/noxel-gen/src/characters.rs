@@ -13,7 +13,7 @@
 use noxel_asset::image::Image;
 use noxel_core::math::Color8;
 
-use crate::draw;
+use crate::draw::{self, Area};
 use crate::palette::*;
 
 /// Cell width in pixels.
@@ -34,9 +34,14 @@ pub const IDLE_COLUMN: usize = 4;
 /// Hair, trousers and boots, so the three figures read as one cast.
 const HAIR: Color8 = DIRT_DARK;
 const HAIR_LIGHT: Color8 = DIRT_MID;
-const TROUSERS: Color8 = STONE_DARK;
-const TROUSERS_LIGHT: Color8 = STONE_MID;
-const BOOTS: Color8 = SHADOW;
+/// The near leg is lighter than the far one, which is what gives the profile
+/// views depth without a second animation.
+const TROUSERS: Color8 = STONE_MID;
+const TROUSERS_LIGHT: Color8 = STONE_LIGHT;
+const TROUSERS_FAR: Color8 = STONE_DARK;
+/// Boots are dark leather, not the outline colour: pure black legs read as a
+/// silhouette rather than as a figure.
+const BOOTS: Color8 = DIRT_DARK;
 
 /// Which pose a cell shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,6 +98,9 @@ pub fn frame_name(direction: &str, column: usize) -> String {
 /// One character cell, or `None` for an unknown direction.
 #[must_use]
 pub fn character(direction: &str, pose: Pose) -> Option<Image> {
+    if !DIRECTIONS.contains(&direction) {
+        return None;
+    }
     let frame = match pose {
         Pose::Idle => IDLE_COLUMN,
         Pose::Walk(index) => index % WALK_FRAMES,
@@ -122,48 +130,50 @@ pub fn character(direction: &str, pose: Pose) -> Option<Image> {
 
 /// Head and face. The four directions are told apart by the face, not by the
 /// body: two eyes down, one eye and a nose in profile, no face at all up.
+///
+/// The right-facing pose is drawn as a left-facing profile and mirrored by the
+/// caller, so the two profiles cannot drift apart.
 fn draw_head(image: &mut Image, direction: &str, bob: i32) {
     let top = 2 + bob;
+    let profile = direction == "left" || direction == "right";
+    let back_of_head = direction == "up";
 
-    // The skull, in hair.
-    if direction == "up" {
-        draw::fill(image, 4, top, 11, top + 7, HAIR);
+    // The skull, in hair. The two top corners are knocked out so the head
+    // reads as round rather than as a box.
+    if back_of_head {
+        draw::fill(image, Area::new(4, top, 11, top + 7), HAIR);
         draw::hline(image, 5, 10, top + 1, HAIR_LIGHT);
         draw::put(image, 5, top + 2, HAIR_LIGHT);
+        draw::vline(image, 5, top + 3, top + 6, HAIR_LIGHT);
     } else {
-        draw::fill(image, 4, top, 11, top + 3, HAIR);
+        draw::fill(image, Area::new(4, top, 11, top + 3), HAIR);
         draw::hline(image, 5, 10, top, HAIR_LIGHT);
     }
+    draw::clear(image, 4, top);
+    draw::clear(image, 11, top);
 
-    // The face.
-    if direction == "up" {
-        // Nothing: the back of the head.
-    } else {
-        draw::fill(image, 5, top + 4, 10, top + 7, SAND_LIGHT);
-        draw::vline(image, 5, top + 4, top + 7, SAND_LIGHT);
+    if !back_of_head {
+        // The face, with the side locks framing it.
+        draw::fill(image, Area::new(5, top + 4, 10, top + 7), SAND_LIGHT);
         draw::vline(image, 10, top + 4, top + 7, DIRT_LIGHT);
-        // Side locks framing the face.
         draw::vline(image, 4, top + 3, top + 6, HAIR);
         draw::vline(image, 11, top + 3, top + 6, HAIR);
     }
 
-    match direction {
-        "down" => {
-            draw::put(image, 6, top + 5, SHADOW);
-            draw::put(image, 9, top + 5, SHADOW);
-            draw::hline(image, 7, 8, top + 7, DIRT_LIGHT);
-        }
-        "left" => {
-            // Profile: the nose sticks out, one eye, a short mouth.
-            draw::fill(image, 4, top + 4, 10, top + 7, SAND_LIGHT);
-            draw::vline(image, 11, top + 2, top + 7, HAIR);
-            draw::hline(image, 4, 10, top + 4, HAIR);
-            draw::put(image, 3, top + 5, SAND_LIGHT);
-            draw::put(image, 3, top + 6, DIRT_LIGHT);
-            draw::put(image, 5, top + 6, SHADOW);
-            draw::hline(image, 4, 5, top + 7, DIRT_LIGHT);
-        }
-        _ => {}
+    if direction == "down" {
+        draw::put(image, 6, top + 5, SHADOW);
+        draw::put(image, 9, top + 5, SHADOW);
+        draw::hline(image, 7, 8, top + 7, DIRT_LIGHT);
+    } else if profile {
+        // The nose sticks out past the forehead, one eye, a short mouth, and a
+        // mass of hair over the back of the skull.
+        draw::fill(image, Area::new(4, top + 4, 10, top + 7), SAND_LIGHT);
+        draw::vline(image, 11, top + 2, top + 7, HAIR);
+        draw::hline(image, 4, 10, top + 4, HAIR);
+        draw::put(image, 3, top + 5, SAND_LIGHT);
+        draw::put(image, 3, top + 6, DIRT_LIGHT);
+        draw::put(image, 5, top + 6, SHADOW);
+        draw::hline(image, 4, 5, top + 7, DIRT_LIGHT);
     }
 }
 
@@ -173,7 +183,7 @@ fn draw_torso(image: &mut Image, direction: &str, bob: i32) {
     let bottom = 16 + bob;
     let profile = direction == "left" || direction == "right";
 
-    draw::fill(image, 5, top, 10, bottom, ROOF_RED);
+    draw::fill(image, Area::new(5, top, 10, bottom), ROOF_RED);
     draw::hline(image, 5, 10, top, ROOF_LIGHT);
     draw::vline(image, 10, top, bottom, ROOF_DARK);
     draw::hline(image, 5, 10, top + 3, ROOF_DARK);
@@ -182,7 +192,7 @@ fn draw_torso(image: &mut Image, direction: &str, bob: i32) {
     // Arms: sleeve over hand, one per side, hanging at the seam.
     let (left_arm, right_arm) = if profile { (6, 9) } else { (3, 11) };
     for x in [left_arm, right_arm] {
-        draw::fill(image, x, top + 1, x + 1, top + 4, ROOF_RED);
+        draw::fill(image, Area::new(x, top + 1, x + 1, top + 4), ROOF_RED);
         draw::put(image, x, top + 5, SAND_LIGHT);
         draw::put(image, x + 1, top + 5, SAND_LIGHT);
     }
@@ -195,34 +205,40 @@ fn draw_torso(image: &mut Image, direction: &str, bob: i32) {
     draw::put(image, 8, bottom, SAND_LIGHT);
 }
 
-/// Legs and boots. The near leg is drawn after the far one so the walk cycle
+/// Legs and boots. The near leg is drawn after the far one, so the walk cycle
 /// reads in profile as well as from above.
+///
+/// Each frame gives an explicit `(x, lift)` per leg rather than deriving one
+/// from the other: a contact frame plants one leg out to the side (or strides
+/// it forward, in profile) while the other stays under the body, and a passing
+/// frame brings both together with one foot lifted.
 fn draw_legs(image: &mut Image, direction: &str, frame: usize) {
     let profile = direction == "left" || direction == "right";
-    // Per-frame foot placement: contact, passing, opposite contact, passing.
-    let (near_dx, far_dx, near_lift, far_lift) = match frame {
-        0 => (-1, 1, 0, 0),
-        1 => (0, 0, 1, 0),
-        2 => (1, -1, 0, 0),
-        _ => (0, 0, 0, 1),
-    };
-
-    let far_color = SHADOW;
-    if profile {
-        leg(image, 8 + far_dx, far_color, BOOTS, far_lift);
-        leg(image, 6 + near_dx, TROUSERS, BOOTS, near_lift);
+    let (far, near) = if profile {
+        match frame {
+            0 => ((9, 1), (5, 0)), // the near leg strides forward
+            1 => ((8, 0), (7, 1)), // passing: the near foot comes up
+            2 => ((5, 0), (9, 1)), // the far leg strides forward
+            _ => ((7, 1), (8, 0)), // passing: the far foot comes up
+        }
     } else {
-        leg(image, 5 + far_dx, far_color, BOOTS, far_lift);
-        leg(image, 9 + near_dx, TROUSERS, BOOTS, near_lift);
-    }
+        match frame {
+            0 => ((4, 0), (9, 0)),  // contact: the left leg is planted wide
+            1 => ((9, 1), (6, 0)),  // passing: both legs under the body
+            2 => ((5, 0), (10, 0)), // contact: the right leg is planted wide
+            _ => ((6, 0), (9, 1)),  // passing: both legs under the body
+        }
+    };
+    leg(image, far.0, TROUSERS_FAR, TROUSERS, BOOTS, far.1);
+    leg(image, near.0, TROUSERS, TROUSERS_LIGHT, BOOTS, near.1);
 }
 
-/// One leg: a trouser column from the hip to `y = 20` and a boot below it.
-fn leg(image: &mut Image, x: i32, trousers: Color8, boot: Color8, lift: i32) {
+/// One leg: a trouser column from the hip to the ankle, and a boot below it.
+fn leg(image: &mut Image, x: i32, trousers: Color8, highlight: Color8, boot: Color8, lift: i32) {
     let hip = 16;
     let ankle = 20 - lift;
-    draw::fill(image, x, hip, x + 1, ankle, trousers);
-    draw::vline(image, x, hip, ankle, TROUSERS_LIGHT);
+    draw::fill(image, Area::new(x, hip, x + 1, ankle), trousers);
+    draw::vline(image, x, hip, ankle, highlight);
     draw::hline(image, x, x + 1, hip, trousers);
     draw::hline(image, x, x + 1, ankle + 1 - lift, boot);
     draw::hline(image, x - 1, x + 2, ankle + 2 - lift, boot);

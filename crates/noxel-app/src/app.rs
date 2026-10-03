@@ -367,9 +367,14 @@ impl App {
             physics: PhysicsWorld::new(noxel_physics::PhysicsConfig::default()),
             streamer,
             visibility: VisibilitySystem::new(config.visibility.clone()),
-            debug: match &config.dump {
-                Some((dir, format)) => DebugSystem::with_dump(dir, *format)?,
-                None => DebugSystem::new(config.debug.clone()),
+            debug: {
+                // The overlay configuration and the frame dumper are independent:
+                // turning dumping on must not turn the panels back on.
+                let mut debug = DebugSystem::new(config.debug.clone());
+                if let Some((dir, format)) = &config.dump {
+                    debug.set_dumper(Some(noxel_debug::FrameDumper::new(dir, *format)?));
+                }
+                debug
             },
             camera,
             clock,
@@ -568,14 +573,22 @@ impl App {
         let mut framebuffer = std::mem::take(&mut self.framebuffer);
         self.with_registry(|plugins, app| plugins.draw(app, &mut framebuffer));
         self.framebuffer = framebuffer;
-        let view = self.context.view.clone();
+        let view = self.context.view;
         self.context.debug.draw(&mut self.framebuffer, Some(&view));
     }
 
     /// Resolves the framebuffer to an sRGB image.
+    ///
+    /// The tone curve is derived from the mode the frame was actually rendered
+    /// with, not from `config.render.mode`: a caller can switch modes at runtime
+    /// (`AppConfig::with_mode`) without touching the render settings, and getting
+    /// this wrong means a ray-traced frame (which carries HDR radiance above 1.0)
+    /// resolves with no curve at all.
     #[must_use]
     pub fn resolve(&self) -> noxel_asset::image::Image {
-        self.framebuffer.resolve(&self.config.render.resolve())
+        let mut settings = self.config.render.clone();
+        settings.mode = self.config.mode;
+        self.framebuffer.resolve(&settings.resolve())
     }
 
     /// A mutable reference to the internal renderer.
@@ -630,10 +643,31 @@ fn load_assets(assets: &mut AssetDb) -> (Arc<TileSet>, Vec<Arc<Prefab>>) {
         Ok(manifest) => (manifest.tile_sets.clone(), manifest.prefabs.clone()),
         Err(_) => (vec!["tilesets/terrain.json".to_string()], Vec::new()),
     };
-    let tile_set = tile_set_paths
-        .iter()
-        .find_map(|path| assets.tile_set(path).ok())
-        .unwrap_or_default();
+    // Every tile set in the manifest is **merged** into one, because they share
+    // a single global tile-id space: the terrain set owns 0..16 and the building
+    // set owns 16..28, and a prefab's voxel ids have to resolve through the same
+    // lookup the world uses. A tile that names no texture of its own inherits its
+    // set's.
+    let mut merged = TileSet::default();
+    for path in &tile_set_paths {
+        let Ok(set) = assets.tile_set(path) else {
+            continue;
+        };
+        if merged.tiles.is_empty() {
+            merged.name = set.name.clone();
+            merged.tile_size = set.tile_size;
+        }
+        for tile in &set.tiles {
+            let mut tile = tile.clone();
+            if tile.texture.is_empty() {
+                tile.texture = set.texture.clone();
+            }
+            merged.tiles.push(tile);
+        }
+    }
+    merged.tiles.sort_by_key(|tile| tile.id);
+    merged.tiles.dedup_by_key(|tile| tile.id);
+    let tile_set = Arc::new(merged);
     let prefabs = prefab_paths
         .iter()
         .filter_map(|path| assets.prefab(path).ok())

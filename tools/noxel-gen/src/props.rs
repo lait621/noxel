@@ -11,7 +11,7 @@
 use noxel_asset::image::Image;
 use noxel_core::math::Color8;
 
-use crate::draw;
+use crate::draw::{self, Area};
 use crate::palette::*;
 
 /// Width and height of an ordinary prop cell.
@@ -39,6 +39,10 @@ pub struct Cell {
 /// Every prop cell, in sheet order. The layout is fixed: it is the contract the
 /// demo's prop renderer is written against, and it is documented in
 /// `assets/README.md`.
+///
+/// A prop stands on the ground, so its cell is **bottom-aligned**: a 16x16 prop
+/// sits in the lower 16 rows of the 24-pixel sheet and a 24x24 canopy fills it.
+/// A renderer places a prop by its bottom-centre.
 pub const CELLS: [Cell; 14] = [
     Cell {
         name: "tree_canopy_0",
@@ -64,77 +68,77 @@ pub const CELLS: [Cell; 14] = [
     Cell {
         name: "tree_trunk",
         x: 72,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "bush",
         x: 88,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "rock_small",
         x: 104,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "rock_large",
         x: 120,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "flower",
         x: 136,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "fence_h",
         x: 152,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "fence_v",
         x: 168,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "well",
         x: 184,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "lamp_post",
         x: 200,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "barrel",
         x: 216,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
     Cell {
         name: "crate",
         x: 232,
-        y: 0,
+        y: HEIGHT - CELL,
         w: CELL,
         h: CELL,
     },
@@ -221,7 +225,7 @@ fn trunk() -> Image {
     let seed = draw::seed_of("trunk");
     let mut img = Image::transparent(CELL, CELL);
     // The bole.
-    draw::fill(&mut img, 6, 1, 9, 13, DIRT_MID);
+    draw::fill(&mut img, Area::new(6, 1, 9, 13), DIRT_MID);
     draw::vline(&mut img, 6, 1, 13, DIRT_LIGHT);
     draw::vline(&mut img, 9, 1, 13, DIRT_DARK);
     for y in 2..13 {
@@ -233,7 +237,7 @@ fn trunk() -> Image {
         }
     }
     // Roots flaring at the base.
-    draw::fill(&mut img, 4, 13, 11, 14, DIRT_MID);
+    draw::fill(&mut img, Area::new(4, 13, 11, 14), DIRT_MID);
     draw::hline(&mut img, 3, 12, 15, DIRT_DARK);
     draw::put(&mut img, 4, 13, DIRT_LIGHT);
     draw::put(&mut img, 11, 14, DIRT_DARK);
@@ -359,7 +363,7 @@ fn fence() -> Image {
     }
     // Posts.
     for x in [2, 12] {
-        draw::fill(&mut img, x, 3, x + 1, 14, DIRT_MID);
+        draw::fill(&mut img, Area::new(x, 3, x + 1, 14), DIRT_MID);
         draw::vline(&mut img, x, 3, 14, DIRT_LIGHT);
         draw::vline(&mut img, x + 1, 3, 14, DIRT_DARK);
         draw::hline(&mut img, x, x + 1, 3, DIRT_LIGHT);
@@ -373,26 +377,26 @@ fn fence() -> Image {
 fn well() -> Image {
     let mut img = Image::transparent(CELL, CELL);
     // Roof.
-    draw::fill(&mut img, 2, 1, 13, 2, ROOF_RED);
+    draw::fill(&mut img, Area::new(2, 1, 13, 2), ROOF_RED);
     draw::hline(&mut img, 3, 12, 3, ROOF_DARK);
     draw::hline(&mut img, 2, 13, 1, ROOF_LIGHT);
     // Posts.
     draw::vline(&mut img, 4, 3, 7, DIRT_MID);
     draw::vline(&mut img, 11, 3, 7, DIRT_DARK);
     // Stone ring.
-    draw::fill(&mut img, 2, 8, 13, 14, STONE_MID);
+    draw::fill(&mut img, Area::new(2, 8, 13, 14), STONE_MID);
     draw::hline(&mut img, 2, 13, 8, STONE_LIGHT);
     draw::hline(&mut img, 2, 13, 14, STONE_DARK);
     draw::vline(&mut img, 2, 8, 14, STONE_LIGHT);
     draw::vline(&mut img, 13, 8, 14, STONE_DARK);
     // Water in the shaft.
-    draw::fill(&mut img, 5, 10, 10, 12, WATER_DEEP);
+    draw::fill(&mut img, Area::new(5, 10, 10, 12), WATER_DEEP);
     draw::hline(&mut img, 5, 10, 10, WATER_SHALLOW);
     draw::put(&mut img, 7, 11, FOAM);
     // Bucket on a rope.
     draw::put(&mut img, 7, 5, DIRT_DARK);
     draw::put(&mut img, 7, 6, DIRT_MID);
-    draw::fill(&mut img, 6, 6, 8, 7, DIRT_MID);
+    draw::fill(&mut img, Area::new(6, 6, 8, 7), DIRT_MID);
     draw::hline(&mut img, 6, 8, 7, DIRT_DARK);
     draw::outline(&mut img, SHADOW);
     img
@@ -402,8 +406,8 @@ fn well() -> Image {
 fn lamp_post() -> Image {
     let mut img = Image::transparent(CELL, CELL);
     // Head: a dark frame around warm glass.
-    draw::fill(&mut img, 5, 1, 10, 4, SHADOW);
-    draw::fill(&mut img, 6, 2, 9, 3, SAND_LIGHT);
+    draw::fill(&mut img, Area::new(5, 1, 10, 4), SHADOW);
+    draw::fill(&mut img, Area::new(6, 2, 9, 3), SAND_LIGHT);
     draw::hline(&mut img, 6, 9, 2, FOAM);
     draw::hline(&mut img, 5, 10, 5, STONE_DARK);
     // Pole.
@@ -411,7 +415,7 @@ fn lamp_post() -> Image {
     draw::vline(&mut img, 8, 5, 14, STONE_DARK);
     draw::put(&mut img, 7, 6, STONE_LIGHT);
     // Base.
-    draw::fill(&mut img, 5, 14, 10, 15, STONE_MID);
+    draw::fill(&mut img, Area::new(5, 14, 10, 15), STONE_MID);
     draw::hline(&mut img, 5, 10, 14, STONE_LIGHT);
     draw::hline(&mut img, 5, 10, 15, SHADOW);
     draw::outline(&mut img, SHADOW);
@@ -422,7 +426,7 @@ fn lamp_post() -> Image {
 fn barrel() -> Image {
     let seed = draw::seed_of("barrel");
     let mut img = Image::transparent(CELL, CELL);
-    draw::fill(&mut img, 4, 2, 11, 14, DIRT_MID);
+    draw::fill(&mut img, Area::new(4, 2, 11, 14), DIRT_MID);
     // Staves.
     for x in [5, 7, 9] {
         draw::vline(&mut img, x, 2, 14, DIRT_DARK);
@@ -449,9 +453,9 @@ fn barrel() -> Image {
 /// A slatted wooden crate.
 fn crate_box() -> Image {
     let mut img = Image::transparent(CELL, CELL);
-    draw::fill(&mut img, 2, 3, 13, 14, DIRT_MID);
+    draw::fill(&mut img, Area::new(2, 3, 13, 14), DIRT_MID);
     // Frame.
-    draw::frame(&mut img, 2, 3, 13, 14, DIRT_DARK);
+    draw::frame(&mut img, Area::new(2, 3, 13, 14), DIRT_DARK);
     draw::hline(&mut img, 2, 13, 4, DIRT_LIGHT);
     draw::vline(&mut img, 3, 4, 13, DIRT_LIGHT);
     // Cross braces.

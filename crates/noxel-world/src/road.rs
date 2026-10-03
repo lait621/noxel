@@ -157,14 +157,10 @@ impl RoadSegment {
     #[must_use]
     pub fn clip_to_aabb(&self, bounds: &Aabb) -> Option<Self> {
         let (t0, t1) = clip_parameters(
-            self.from.x,
-            self.from.z,
-            self.to.x,
-            self.to.z,
-            bounds.min.x,
-            bounds.min.z,
-            bounds.max.x,
-            bounds.max.z,
+            xz(self.from),
+            xz(self.to),
+            Vec2::new(bounds.min.x, bounds.min.z),
+            Vec2::new(bounds.max.x, bounds.max.z),
         )?;
         let from = self.from.lerp(self.to, t0);
         let to = self.from.lerp(self.to, t1);
@@ -256,17 +252,12 @@ fn xz(v: Vec3) -> Vec2 {
 /// `None` when the segment misses it. Degenerate boxes are treated as misses
 /// rather than as everything.
 #[must_use]
-fn clip_parameters(
-    ax: f32,
-    az: f32,
-    bx: f32,
-    bz: f32,
-    x0: f32,
-    z0: f32,
-    x1: f32,
-    z1: f32,
-) -> Option<(f32, f32)> {
-    if !(x1 > x0) || !(z1 > z0) {
+fn clip_parameters(a: Vec2, b: Vec2, min: Vec2, max: Vec2) -> Option<(f32, f32)> {
+    let (ax, az) = (a.x, a.y);
+    let (bx, bz) = (b.x, b.y);
+    let (x0, z0) = (min.x, min.y);
+    let (x1, z1) = (max.x, max.y);
+    if x1 <= x0 || z1 <= z0 {
         return None;
     }
     let dx = bx - ax;

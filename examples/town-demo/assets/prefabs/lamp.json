@@ -1,0 +1,45 @@
+{
+  "name": "lamp",
+  "size": [
+    1,
+    1,
+    1
+  ],
+  "tags": [
+    "prop",
+    "street"
+  ],
+  "voxels": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "tile": 13,
+      "name": "plaza"
+    }
+  ],
+  "props": [
+    {
+      "kind": "lamp_post",
+      "position": [
+        0.5,
+        0,
+        0.5
+      ],
+      "yaw": 0,
+      "scale": 1
+    }
+  ],
+  "spawns": [
+    {
+      "name": "light",
+      "position": [
+        0.5,
+        0,
+        0.5
+      ],
+      "yaw": 0
+    }
+  ],
+  "occluders": []
+}

@@ -53,6 +53,11 @@ pub struct Chunk {
     /// Buildings that intersect this chunk.
     pub buildings: Vec<TownBuilding>,
     /// Road centre lines that intersect this chunk, in world space.
+    ///
+    /// Each entry is the piece of a road that crosses this chunk, clipped to the
+    /// chunk footprint (plus half the paved width), so the pieces tile the
+    /// network exactly and two neighbouring chunks never report the same
+    /// pavement twice.
     pub roads: Vec<crate::road::RoadSegment>,
     /// True when this chunk contains any part of a town.
     pub has_town: bool,

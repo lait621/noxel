@@ -1,0 +1,55 @@
+{
+  "name": "tree_oak",
+  "size": [
+    1,
+    1,
+    1
+  ],
+  "tags": [
+    "prop",
+    "tree"
+  ],
+  "voxels": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "tile": 0,
+      "name": "grass"
+    }
+  ],
+  "props": [
+    {
+      "kind": "tree_trunk",
+      "position": [
+        0.5,
+        0,
+        0.5
+      ],
+      "yaw": 0,
+      "scale": 1.25
+    },
+    {
+      "kind": "tree_canopy_2",
+      "position": [
+        0.5,
+        1.25,
+        0.5
+      ],
+      "yaw": 0,
+      "scale": 1.5
+    }
+  ],
+  "spawns": [
+    {
+      "name": "chop",
+      "position": [
+        0.5,
+        0,
+        0.5
+      ],
+      "yaw": 0
+    }
+  ],
+  "occluders": []
+}

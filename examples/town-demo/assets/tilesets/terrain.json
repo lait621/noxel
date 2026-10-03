@@ -1,0 +1,343 @@
+{
+  "name": "terrain",
+  "texture": "textures/terrain.png",
+  "tile_size": 16,
+  "tiles": [
+    {
+      "id": 0,
+      "name": "grass",
+      "texture": "",
+      "uv": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 1,
+      "name": "grass_dark",
+      "texture": "",
+      "uv": [
+        16,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 2,
+      "name": "grass_flowers",
+      "texture": "",
+      "uv": [
+        32,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 3,
+      "name": "dirt",
+      "texture": "",
+      "uv": [
+        48,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 4,
+      "name": "dirt_dark",
+      "texture": "",
+      "uv": [
+        64,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 5,
+      "name": "sand",
+      "texture": "",
+      "uv": [
+        80,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 6,
+      "name": "rock",
+      "texture": "",
+      "uv": [
+        96,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": false,
+        "blocks_sight": true,
+        "occluder": true,
+        "water": false,
+        "road": false,
+        "buildable": false
+      },
+      "height": 1,
+      "layer": 1
+    },
+    {
+      "id": 7,
+      "name": "rock_dark",
+      "texture": "",
+      "uv": [
+        112,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": false,
+        "blocks_sight": true,
+        "occluder": true,
+        "water": false,
+        "road": false,
+        "buildable": false
+      },
+      "height": 1,
+      "layer": 1
+    },
+    {
+      "id": 8,
+      "name": "cliff",
+      "texture": "",
+      "uv": [
+        128,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": false,
+        "blocks_sight": true,
+        "occluder": true,
+        "water": false,
+        "road": false,
+        "buildable": false
+      },
+      "height": 2,
+      "layer": 1
+    },
+    {
+      "id": 9,
+      "name": "water_shallow",
+      "texture": "",
+      "uv": [
+        144,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": false,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": true,
+        "road": false,
+        "buildable": false
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 10,
+      "name": "water_deep",
+      "texture": "",
+      "uv": [
+        160,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": false,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": true,
+        "road": false,
+        "buildable": false
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 11,
+      "name": "road",
+      "texture": "",
+      "uv": [
+        176,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": true,
+        "buildable": false
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 12,
+      "name": "road_edge",
+      "texture": "",
+      "uv": [
+        192,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": true,
+        "buildable": false
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 13,
+      "name": "plaza",
+      "texture": "",
+      "uv": [
+        208,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": true,
+        "buildable": false
+      },
+      "height": 0,
+      "layer": 0
+    },
+    {
+      "id": 14,
+      "name": "bridge",
+      "texture": "",
+      "uv": [
+        224,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": true,
+        "buildable": false
+      },
+      "height": 0.25,
+      "layer": 1
+    },
+    {
+      "id": 15,
+      "name": "snow",
+      "texture": "",
+      "uv": [
+        240,
+        0,
+        16,
+        16
+      ],
+      "flags": {
+        "walkable": true,
+        "blocks_sight": false,
+        "occluder": false,
+        "water": false,
+        "road": false,
+        "buildable": true
+      },
+      "height": 0,
+      "layer": 0
+    }
+  ]
+}

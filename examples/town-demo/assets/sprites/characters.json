@@ -1,0 +1,298 @@
+{
+  "name": "characters",
+  "texture": "textures/characters.png",
+  "uv": [
+    64,
+    0,
+    16,
+    24
+  ],
+  "pivot": [
+    0.5,
+    1
+  ],
+  "size": [
+    1,
+    1.5
+  ],
+  "frames": [
+    {
+      "name": "walk_down_00",
+      "uv": [
+        0,
+        0,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_down_01",
+      "uv": [
+        16,
+        0,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_down_02",
+      "uv": [
+        32,
+        0,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_down_03",
+      "uv": [
+        48,
+        0,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "idle_down",
+      "uv": [
+        64,
+        0,
+        16,
+        24
+      ],
+      "duration": 0.25
+    },
+    {
+      "name": "walk_left_00",
+      "uv": [
+        0,
+        24,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_left_01",
+      "uv": [
+        16,
+        24,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_left_02",
+      "uv": [
+        32,
+        24,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_left_03",
+      "uv": [
+        48,
+        24,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "idle_left",
+      "uv": [
+        64,
+        24,
+        16,
+        24
+      ],
+      "duration": 0.25
+    },
+    {
+      "name": "walk_right_00",
+      "uv": [
+        0,
+        48,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_right_01",
+      "uv": [
+        16,
+        48,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_right_02",
+      "uv": [
+        32,
+        48,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_right_03",
+      "uv": [
+        48,
+        48,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "idle_right",
+      "uv": [
+        64,
+        48,
+        16,
+        24
+      ],
+      "duration": 0.25
+    },
+    {
+      "name": "walk_up_00",
+      "uv": [
+        0,
+        72,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_up_01",
+      "uv": [
+        16,
+        72,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_up_02",
+      "uv": [
+        32,
+        72,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "walk_up_03",
+      "uv": [
+        48,
+        72,
+        16,
+        24
+      ],
+      "duration": 0.125
+    },
+    {
+      "name": "idle_up",
+      "uv": [
+        64,
+        72,
+        16,
+        24
+      ],
+      "duration": 0.25
+    }
+  ],
+  "animations": [
+    {
+      "name": "walk_down",
+      "frames": [
+        "walk_down_00",
+        "walk_down_01",
+        "walk_down_02",
+        "walk_down_03"
+      ],
+      "loop": true,
+      "duration": 0.5
+    },
+    {
+      "name": "idle_down",
+      "frames": [
+        "idle_down"
+      ],
+      "loop": true,
+      "duration": 0.25
+    },
+    {
+      "name": "walk_left",
+      "frames": [
+        "walk_left_00",
+        "walk_left_01",
+        "walk_left_02",
+        "walk_left_03"
+      ],
+      "loop": true,
+      "duration": 0.5
+    },
+    {
+      "name": "idle_left",
+      "frames": [
+        "idle_left"
+      ],
+      "loop": true,
+      "duration": 0.25
+    },
+    {
+      "name": "walk_right",
+      "frames": [
+        "walk_right_00",
+        "walk_right_01",
+        "walk_right_02",
+        "walk_right_03"
+      ],
+      "loop": true,
+      "duration": 0.5
+    },
+    {
+      "name": "idle_right",
+      "frames": [
+        "idle_right"
+      ],
+      "loop": true,
+      "duration": 0.25
+    },
+    {
+      "name": "walk_up",
+      "frames": [
+        "walk_up_00",
+        "walk_up_01",
+        "walk_up_02",
+        "walk_up_03"
+      ],
+      "loop": true,
+      "duration": 0.5
+    },
+    {
+      "name": "idle_up",
+      "frames": [
+        "idle_up"
+      ],
+      "loop": true,
+      "duration": 0.25
+    }
+  ]
+}
