@@ -54,7 +54,7 @@ use noxel_valley::player::Player;
 use noxel_valley::sim::{GameState, Item};
 use noxel_valley::ui::{GameUi, Screen, UiAction};
 use noxel_valley::world::FarmMap;
-use noxel_valley::{assets, config, skin, world};
+use noxel_valley::{action, assets, config, skin, world};
 
 /// The farm, the player, the clock and the interface.
 struct Valley {
@@ -446,133 +446,27 @@ impl Valley {
     }
 
     /// Acts on the tile the player is facing.
+    ///
+    /// The rules live in `noxel_valley::action`; this is the part that knows
+    /// about the camera, the swing animation and the toast.
     fn use_tool(&mut self) {
-        if self.state.is_exhausted() {
-            self.game_ui.toast("太累了，去睡一觉吧");
-            return;
-        }
         let tool = self.state.current_tool();
-        let (tx, ty) = self.player.aim_tile();
-        let Some(tile) = self.map.get(tx, ty).copied() else {
-            return;
-        };
-
-        let cost = tool.energy_cost();
+        let aim = self.player.aim_tile();
         self.player.start_swing();
 
-        match tool {
-            config::Tool::Hoe => {
-                // Hoeing a tile that already has a plant in it would uproot it,
-                // which is never what the player meant.
-                if tile.ground.is_hoeable()
-                    && tile.plant.is_none()
-                    && self.state.spend_energy(cost)
-                    && let Some(tile) = self.map.get_mut(tx, ty)
-                {
-                    tile.ground = world::Ground::Tilled;
-                    self.last_action = Some(format!("tilled {tx},{ty}"));
-                }
-            }
-            config::Tool::Can => {
-                let Some(tile) = self.map.get_mut(tx, ty) else {
-                    return;
-                };
-                if tile.ground == world::Ground::Tilled
-                    && !tile.watered
-                    && self.state.spend_energy(cost)
-                {
-                    tile.watered = true;
-                    if let Some(plant) = tile.plant.as_mut() {
-                        plant.watered = true;
-                    }
-                    self.last_action = Some(format!("watered {tx},{ty}"));
-                }
-            }
-            config::Tool::Scythe | config::Tool::Hand => {
-                let harvested = self
-                    .map
-                    .get(tx, ty)
-                    .and_then(|t| t.plant)
-                    .filter(|p| p.is_ripe());
-                if let Some(plant) = harvested {
-                    let leftover = self.state.inventory.add(Item::Produce(plant.crop), 1);
-                    if leftover > 0 {
-                        self.game_ui.toast("背包满了");
-                        return;
-                    }
-                    let _ = self.state.spend_energy(cost);
-                    if let Some(tile) = self.map.get_mut(tx, ty) {
-                        if plant.crop.regrow_days > 0 {
-                            // A regrowing crop is cut back rather than dug up.
-                            if let Some(p) = tile.plant.as_mut() {
-                                p.days = plant
-                                    .crop
-                                    .growth_days
-                                    .saturating_sub(plant.crop.regrow_days);
-                            }
-                        } else {
-                            tile.plant = None;
-                            tile.ground = world::Ground::Dirt;
-                        }
-                    }
-                    self.game_ui.toast(format!("收获 {}", plant.crop.name));
-                    self.last_action = Some(format!("harvested {tx},{ty}"));
-                }
-            }
-            config::Tool::Axe | config::Tool::Pickaxe => {
-                // Clears a weed, a rock or a small prop, which is what opens the
-                // farm up in the first week.
-                let clearable = tile.prop.filter(|name| {
-                    matches!(
-                        *name,
-                        "weed"
-                            | "rock_small"
-                            | "rock_large"
-                            | "bush"
-                            | "log"
-                            | "mushroom"
-                            | "tree_stump"
-                    )
-                });
-                if let Some(name) = clearable {
-                    if self.state.spend_energy(cost) {
-                        if let Some(tile) = self.map.get_mut(tx, ty) {
-                            tile.prop = None;
-                        }
-                        self.last_action = Some(format!("cleared {name} at {tx},{ty}"));
-                    }
-                }
-            }
-        }
-
-        // Planting: a seed in hand on tilled soil.
-        let seeds = self.selected_seed();
-        if let Some(crop) = seeds {
-            if tile.ground == world::Ground::Tilled && tile.plant.is_none() {
-                let item = Item::Seed(crop);
-                if self.state.inventory.count_of(item) > 0 {
-                    self.state.inventory.remove(item, 1);
-                    if let Some(tile) = self.map.get_mut(tx, ty) {
-                        tile.plant = Some(world::Plant::new(crop));
-                    }
-                    self.game_ui.toast(format!("种下 {}", crop.name));
-                    self.last_action = Some(format!("planted {} at {tx},{ty}", crop.key));
-                }
-            }
-        }
-    }
-
-    /// The crop whose seed is in the selected slot, if any.
-    fn selected_seed(&self) -> Option<&'static config::Crop> {
-        let slot = self
+        let selected = self
             .state
             .inventory
             .slots()
-            .get(self.state.selected)?
-            .as_ref()?;
-        match slot.item {
-            Item::Seed(crop) => Some(crop),
-            _ => None,
+            .get(self.state.selected)
+            .and_then(|slot| *slot)
+            .map(|slot| slot.item);
+        let outcome = action::use_tool(&mut self.map, &mut self.state, tool, selected, aim);
+        if let Some(message) = outcome.message() {
+            self.game_ui.toast(message);
+        }
+        if outcome.changed_something() {
+            self.last_action = Some(format!("{outcome:?} at {aim:?}"));
         }
     }
 
@@ -1236,14 +1130,35 @@ mod tests {
             assert!(!Args::default().wants_window());
             return;
         }
-        assert!(Args::default().wants_window(), "no arguments should play the game");
-        assert!(Args { window: true, ..Args::default() }.wants_window());
+        assert!(
+            Args::default().wants_window(),
+            "no arguments should play the game"
+        );
+        assert!(
+            Args {
+                window: true,
+                ..Args::default()
+            }
+            .wants_window()
+        );
 
         let headless = [
-            Args { frames: 300, ..Args::default() },
-            Args { stats: true, ..Args::default() },
-            Args { dump: Some(std::path::PathBuf::from("frames")), ..Args::default() },
-            Args { screen: Some(Screen::Shop), ..Args::default() },
+            Args {
+                frames: 300,
+                ..Args::default()
+            },
+            Args {
+                stats: true,
+                ..Args::default()
+            },
+            Args {
+                dump: Some(std::path::PathBuf::from("frames")),
+                ..Args::default()
+            },
+            Args {
+                screen: Some(Screen::Shop),
+                ..Args::default()
+            },
         ];
         for args in headless {
             assert!(!args.wants_window(), "{args:?} should render, not play");

@@ -6,6 +6,7 @@
 //!
 //! | Module | What it owns |
 //! |---|---|
+//! | [`action`] | what using a tool on a tile does — the game's core verb |
 //! | [`config`] | every number and data table the game is tuned by |
 //! | [`world`] | the tile grid, the farm layout, and the mesh built from it |
 //! | [`player`] | movement, facing, the tool swing, screen-to-tile |
@@ -44,6 +45,7 @@
 #![deny(missing_docs)]
 #![warn(clippy::all)]
 
+pub mod action;
 pub mod assets;
 pub mod config;
 pub mod player;

@@ -200,7 +200,12 @@ impl WeatherSystem {
     }
 
     /// Slides the forecast forward one day and rolls a new last entry.
-    fn advance(&mut self, season: Season) {
+    ///
+    /// Public because it is a legitimate thing for a game to do — a debug
+    /// command, a cheat, a scripted story day — and because a test that wants to
+    /// know what happens on a dry day should be able to arrange one rather than
+    /// search for a seed that produces it.
+    pub fn advance(&mut self, season: Season) {
         for index in 0..FORECAST_DAYS - 1 {
             self.forecast[index] = self.forecast[index + 1];
         }
