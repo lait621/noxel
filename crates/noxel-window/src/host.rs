@@ -374,15 +374,25 @@ fn blit(
     // Whole-number upscale, centred. `scale` is at least 1 here, which is what
     // makes the divisions total.
     let scale = scale.max(1);
-    for y in 0..height {
-        let Some(sy) = sample_axis(i64::from(y) - offset_y, scale) else {
-            continue;
-        };
-        if sy >= source_height {
+    let stride = width as usize;
+    // Every destination row in a band of `scale` rows samples the *same* source
+    // row, so the row is sampled once and copied down the band instead of being
+    // resampled for each of its copies. At a 3x window that is a third of the
+    // packing work and a third of the per-pixel bounds checks; measured, the
+    // blit was the most expensive function in a presented frame before this.
+    let first_row = offset_y.max(0);
+    let last_row = (offset_y + i64::from(source_height) * i64::from(scale)).min(i64::from(height));
+    for sy in 0..source_height {
+        let band_top = offset_y + i64::from(sy) * i64::from(scale);
+        let band_end = (band_top + i64::from(scale)).min(last_row);
+        let band_start = band_top.max(first_row);
+        if band_start >= band_end {
+            // Letterbox above or below the image: the background fill is the
+            // whole of what this band contributes.
             continue;
         }
         let source_row = (sy as usize) * (source_width as usize);
-        let out_row = (y as usize) * (width as usize);
+        let out_row = (band_start as usize) * stride;
         for x in 0..width {
             let Some(sx) = sample_axis(i64::from(x) - offset_x, scale) else {
                 continue;
@@ -391,6 +401,10 @@ fn blit(
                 continue;
             }
             out[out_row + x as usize] = pack(pixels[source_row + sx as usize]);
+        }
+        for y in (band_start + 1)..band_end {
+            let start = (y as usize) * stride;
+            out.copy_within(out_row..out_row + stride, start);
         }
     }
 }
@@ -572,5 +586,94 @@ mod tests {
         let mut out = vec![0u32; 1];
         blit(&source, 1, 1, &mut out, 1, 1, 1, [0, 0, 0]);
         assert_eq!(out[0], 0x0012_3456, "0x00RRGGBB");
+    }
+
+    /// The obvious per-destination-pixel blit, kept as the definition of what
+    /// the fast one must produce. A presentation bug is a picture that is subtly
+    /// wrong — a row repeated one time too many, a one-pixel shift at the edge —
+    /// and the way to catch it is to compare against the slow, readable version
+    /// over every awkward geometry rather than to eyeball one screenshot.
+    fn reference_blit(
+        pixels: &[Color8],
+        source_width: u32,
+        source_height: u32,
+        width: u32,
+        height: u32,
+        scale: u32,
+        background: [u8; 3],
+    ) -> Vec<u32> {
+        let fill = u32::from(background[0]) << 16
+            | u32::from(background[1]) << 8
+            | u32::from(background[2]);
+        let mut out = vec![fill; (width * height) as usize];
+        if source_width == 0 || source_height == 0 || pixels.is_empty() {
+            return out;
+        }
+        let (ox, oy) = if scale == 0 {
+            (0i64, 0i64)
+        } else {
+            (
+                (i64::from(width) - i64::from(source_width * scale)) / 2,
+                (i64::from(height) - i64::from(source_height * scale)) / 2,
+            )
+        };
+        for y in 0..height {
+            for x in 0..width {
+                let (sx, sy) = if scale == 0 {
+                    (
+                        u64::from(x) * u64::from(source_width) / u64::from(width.max(1)),
+                        u64::from(y) * u64::from(source_height) / u64::from(height.max(1)),
+                    )
+                } else {
+                    let lx = i64::from(x) - ox;
+                    let ly = i64::from(y) - oy;
+                    if lx < 0 || ly < 0 {
+                        continue;
+                    }
+                    (lx as u64 / u64::from(scale), ly as u64 / u64::from(scale))
+                };
+                if sx >= u64::from(source_width) || sy >= u64::from(source_height) {
+                    continue;
+                }
+                let source = pixels[(sy as usize) * (source_width as usize) + sx as usize];
+                out[(y as usize) * (width as usize) + x as usize] = pack(source);
+            }
+        }
+        out
+    }
+
+    fn patterned(width: u32, height: u32) -> Vec<Color8> {
+        (0..width * height)
+            .map(|i| {
+                Color8::new(
+                    (i % 251) as u8,
+                    ((i / 7) % 253) as u8,
+                    ((i / 13) % 247) as u8,
+                    255,
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_banded_blit_is_the_per_pixel_blit() {
+        // Every combination of a source that is smaller than, equal to and
+        // larger than the window, at every whole-number scale, plus the stretch
+        // path — including the geometries where the letterbox eats part of a
+        // band, which is where a row-copying blit goes wrong.
+        for (sw, sh) in [(3u32, 2u32), (8, 5), (1, 1), (5, 4)] {
+            let source = patterned(sw, sh);
+            for (w, h) in [(1u32, 1u32), (6, 4), (16, 9), (8, 8), (5, 20), (20, 5)] {
+                for scale in [0u32, 1, 2, 3, 4] {
+                    let expected = reference_blit(&source, sw, sh, w, h, scale, [7, 8, 9]);
+                    let mut actual = vec![0u32; (w * h) as usize];
+                    blit(&source, sw, sh, &mut actual, w, h, scale, [7, 8, 9]);
+                    assert_eq!(
+                        actual, expected,
+                        "blit({sw}x{sh} -> {w}x{h} at scale {scale}) differs"
+                    );
+                }
+            }
+        }
     }
 }
