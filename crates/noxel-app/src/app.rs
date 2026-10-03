@@ -599,7 +599,32 @@ impl App {
         }
     }
 
-    /// The renderer's name.
+    /// The framebuffer this app renders into.
+    ///
+    /// A window host presents this directly; everything else reads
+    /// [`App::resolve`] for an sRGB image instead.
+    #[must_use]
+    pub fn framebuffer(&self) -> &noxel_render::Framebuffer {
+        &self.framebuffer
+    }
+
+    /// Writes the most recently rendered frame to a PNG, if frame dumping is on.
+    ///
+    /// Returns the path written. This is the "press F8 for a screenshot" entry
+    /// point: it exists on `App` rather than being assembled from `framebuffer()`
+    /// and `debug_mut()` at the call site, because those two borrows cannot be
+    /// held at once.
+    ///
+    /// # Errors
+    /// Returns the I/O error when the file cannot be written.
+    pub fn dump_current_frame(&mut self) -> std::io::Result<Option<std::path::PathBuf>> {
+        if self.config.dump.is_none() {
+            return Ok(None);
+        }
+        self.context.debug.dump_frame(&self.framebuffer)
+    }
+
+    /// The renderer's name, for a report or a window title.
     #[must_use]
     pub fn renderer_name(&self) -> &'static str {
         match self.config.mode {

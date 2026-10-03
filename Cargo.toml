@@ -7,6 +7,7 @@ members = [
     "crates/noxel-render",
     "crates/noxel-camera",
     "crates/noxel-visibility",
+    "crates/noxel-window",
     "crates/noxel-physics",
     "crates/noxel-world",
     "crates/noxel-npc",
@@ -40,10 +41,17 @@ noxel-world = { path = "crates/noxel-world", version = "0.1.0" }
 noxel-npc = { path = "crates/noxel-npc", version = "0.1.0" }
 noxel-debug = { path = "crates/noxel-debug", version = "0.1.0" }
 noxel-app = { path = "crates/noxel-app", version = "0.1.0" }
+noxel-window = { path = "crates/noxel-window", version = "0.1.0", default-features = false }
 
-# NOTE: Noxel intentionally has ZERO third-party dependencies.
-# See docs/adr/0002-no-dependencies.md for the rationale and for the
-# rules a future contributor must follow before adding one.
+# NOTE: Noxel's engine has ZERO third-party dependencies, and `cargo build`
+# downloads nothing. See docs/adr/0002-no-dependencies.md for the rationale and
+# for the rules a future contributor must follow before adding one.
+#
+# `noxel-window` is the single, deliberate exception and it is boxed in: its
+# dependencies are OPTIONAL, off by default, and only reachable through the
+# `window` feature. `cargo build --workspace` and `cargo test --workspace` compile
+# none of them. Turn them on with `--features window` when you want a window;
+# see docs/adr/0011-windowing.md.
 
 # ---- Build profiles -------------------------------------------------------
 [profile.release]

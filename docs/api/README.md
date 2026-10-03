@@ -26,6 +26,7 @@ Replace `noxel_core` with any crate name from the table.
 | [`noxel-world`](../../target/doc/noxel_world/index.html) | procedural terrain, biomes, roads, towns, props, chunk data and LRU streaming, all a pure function of `(seed, position)` | — | `WorldConfig`, `WorldGenerator`, `WorldStreamer`, `Chunk`, `BiomeId` |
 | [`noxel-npc`](../../target/doc/noxel_npc/index.html) | crowd tiers, A\*/flow-field pathfinding, steering and daily schedules, driven by one `NpcSystem` over a `WorldStreamer` and a `PhysicsWorld` | — | `NpcSystem`, `NpcConfig`, `NpcContext`, `CrowdManager`, `NpcAgent` |
 | [`noxel-debug`](../../target/doc/noxel_debug/index.html) | rolling statistics with percentiles, section budgets, the overlay panels and frame dumping/diffing | — | `DebugSystem`, `DebugConfig`, `Stats`, `FrameDumper`, `ImageDiff` |
+| [`noxel-window`](../../crates/noxel-window) | presents the framebuffer on screen and reads player input; the one crate with an optional third-party dependency |
 | [`noxel-app`](../../target/doc/noxel_app/index.html) | the runtime host: fixed-step frame loop, shared context, plugin registry, headless runner | — | `App`, `AppConfig`, `AppContext`, `Plugin`, `InputState` |
 
 `tools/noxel-gen` is a binary, not a library: run it with

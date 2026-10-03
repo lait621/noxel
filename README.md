@@ -37,6 +37,14 @@ moving: top-down RPGs, colony sims, tactical games, anything with a crowd.
 
 ## Quick start
 
+**Play it in a window** (needs the `window` feature; see
+[ADR 0011](docs/adr/0011-windowing.md)):
+
+```bash
+./scripts/run-window.sh                # WASD or arrows to walk, shift to run, escape to quit
+./scripts/run-window.sh --mode hybrid  # with ray-traced shadows
+```
+
 **Run the prebuilt example** (no Rust toolchain needed once `dist/` is built):
 
 ```bash

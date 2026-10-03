@@ -1,0 +1,21 @@
+[package]
+name = "noxel-window"
+description = "Noxel window host: presents the framebuffer on screen and reads player input. The only crate in the workspace with a third-party dependency, and it is opt-in."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+# Off by default. `cargo build` downloads nothing and still needs no network;
+# only a caller who asks for a window pays for winit and softbuffer.
+window = ["dep:winit", "dep:softbuffer"]
+
+[dependencies]
+noxel-core.workspace = true
+noxel-render.workspace = true
+winit = { version = "0.30", optional = true, default-features = false, features = ["rwh_06", "x11", "wayland"] }
+softbuffer = { version = "0.4", optional = true }

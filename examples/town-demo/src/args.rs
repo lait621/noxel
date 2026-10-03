@@ -34,6 +34,23 @@ pub struct Args {
     pub world_info: bool,
     /// Draw the full engine statistics panel over the frame.
     pub debug: bool,
+    /// Open a window instead of writing PNG frames.
+    ///
+    /// Needs the `window` feature; without it this prints how to turn it on.
+    pub window: bool,
+    /// Whether `--frames` was given explicitly.
+    ///
+    /// A headless run has to stop somewhere, so it defaults to 600 frames. A
+    /// *windowed* run has to stop only when the player says so, so the default has
+    /// to be distinguishable from an explicit request. This flag is that
+    /// difference, and it is the reason `--window` alone is playable rather than a
+    /// ten-second demo.
+    pub frames_given: bool,
+    /// Whether `--dump` was given explicitly.
+    ///
+    /// The same argument as `frames_given`: writing 600 PNGs while someone is
+    /// playing is never what they meant.
+    pub dump_given: bool,
 }
 
 impl Default for Args {
@@ -50,6 +67,9 @@ impl Default for Args {
             help: false,
             world_info: false,
             debug: false,
+            window: false,
+            frames_given: false,
+            dump_given: false,
         }
     }
 }
@@ -73,7 +93,11 @@ impl Args {
                 "--stats" => args.stats_only = true,
                 "--world-info" => args.world_info = true,
                 "--debug" => args.debug = true,
-                "--no-dump" => args.dump = None,
+                "--window" => args.window = true,
+                "--no-dump" => {
+                    args.dump = None;
+                    args.dump_given = true;
+                }
                 "--seed" => {
                     let value = iter.next().ok_or("--seed needs a number")?;
                     args.seed = parse_u64(&value, "--seed")?;
@@ -81,6 +105,7 @@ impl Args {
                 "--frames" => {
                     let value = iter.next().ok_or("--frames needs a number")?;
                     args.frames = parse_u64(&value, "--frames")?;
+                    args.frames_given = true;
                 }
                 "--npcs" => {
                     let value = iter.next().ok_or("--npcs needs a number")?;
@@ -99,6 +124,7 @@ impl Args {
                 "--dump" => {
                     let value = iter.next().ok_or("--dump needs a directory")?;
                     args.dump = Some(PathBuf::from(value));
+                    args.dump_given = true;
                 }
                 other => return Err(format!("unknown flag `{other}` (try --help)")),
             }
@@ -136,6 +162,7 @@ OPTIONS:
     --stats           Render one frame, print its statistics, exit
     --world-info      Print the world's shape for this seed, exit
     --debug           Draw the engine statistics panel over the frame
+    --window          Open a real window and play it (needs --features window)
     --quiet           Suppress everything but the summary
     -h, --help        Print this text
 

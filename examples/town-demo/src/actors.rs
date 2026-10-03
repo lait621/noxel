@@ -18,6 +18,32 @@ use noxel_render::scene::InstanceHandle;
 
 use crate::terrain::TerrainPlugin;
 
+/// Reads the movement axis the host has filled in.
+///
+/// WASD *and* the arrow keys, added together and clamped, so a player who reaches
+/// for either gets what they expect. The codes are the same ones
+/// `noxel_window::Input` produces, which is why they can be written as ASCII.
+#[must_use]
+fn read_movement(app: &App) -> (f32, f32) {
+    let input = &app.context.input;
+    let (wx, wz) = input.movement_axis(b'W' as u32, b'S' as u32, b'A' as u32, b'D' as u32);
+    let (ax, az) = input.movement_axis(
+        noxel_window::key::UP,
+        noxel_window::key::DOWN,
+        noxel_window::key::LEFT,
+        noxel_window::key::RIGHT,
+    );
+    let x = (wx + ax).clamp(-1.0, 1.0);
+    let z = (wz + az).clamp(-1.0, 1.0);
+    (x, z)
+}
+
+/// True while either shift key is down.
+#[must_use]
+fn running(app: &App) -> bool {
+    app.context.input.is_held(noxel_window::key::SHIFT)
+}
+
 /// Half the player capsule's total height, in metres.
 const PLAYER_HALF_HEIGHT: f32 = 0.85;
 
@@ -74,6 +100,9 @@ pub struct Waypoint {
 
 /// The player plugin: input, movement and camera following.
 pub struct PlayerPlugin {
+    /// Whether the scripted route is driving the player. See
+    /// [`PlayerPlugin::set_scripted`].
+    pub scripted: bool,
     /// The player, once the world has finished loading.
     pub player: Option<Player>,
     /// The scripted route.
@@ -99,6 +128,7 @@ impl PlayerPlugin {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            scripted: true,
             player: None,
             route: Vec::new(),
             route_cursor: 0,
@@ -145,6 +175,26 @@ impl PlayerPlugin {
             grounded: false,
             distance_travelled: 0.0,
         });
+    }
+
+    /// Whether the scripted route is still driving the player.
+    ///
+    /// Flips to `false` the moment the host reports any movement input, and never
+    /// flips back: a player who has taken the controls does not want them taken
+    /// away by a waypoint.
+    #[must_use]
+    #[allow(dead_code)]
+    pub fn scripted(&self) -> bool {
+        self.scripted
+    }
+
+    /// Hands control to the scripted route, or takes it away.
+    ///
+    /// The window path does not need this — touching the controls flips the flag
+    /// on its own — but a game with a menu does.
+    #[allow(dead_code)]
+    pub fn set_scripted(&mut self, scripted: bool) {
+        self.scripted = scripted;
     }
 
     /// The player, if one exists.
@@ -201,7 +251,20 @@ impl PlayerPlugin {
             .map(|p| p.position)
             .unwrap_or(Vec3::ZERO);
         let yaw = self.player.as_ref().map(|p| p.yaw).unwrap_or(0.0);
-        let desired = if scripted {
+
+        // Input wins over the scripted route, always and immediately.
+        //
+        // This is what makes the windowed demo playable without a mode switch: it
+        // walks itself until someone touches the controls, and from then on it is
+        // theirs. A game with a title screen would call `set_scripted(false)` at
+        // the menu instead; the *fallback* is the interesting part, because it
+        // means the same binary is a screenshot generator and a game.
+        let (input_x, input_z) = read_movement(app);
+        if input_x != 0.0 || input_z != 0.0 {
+            self.scripted = false;
+        }
+
+        let desired = if scripted && self.scripted {
             match self.route.get(self.route_cursor) {
                 Some(waypoint) => {
                     let delta = waypoint.position - position;
@@ -222,16 +285,20 @@ impl PlayerPlugin {
             }
         } else {
             // Free movement: the host fills `InputState`.
-            let (x, z) = app.context.input.movement_axis(87, 83, 65, 68); // W S A D
             let forward = Vec3::new(-yaw.sin(), 0.0, -yaw.cos());
             let right = Vec3::new(-forward.z, 0.0, forward.x);
-            (forward * -z + right * x).normalize_or_zero()
+            (forward * -input_z + right * input_x).normalize_or_zero()
         };
 
         let Some(player) = self.player.as_mut() else {
             return;
         };
-        player.velocity = desired * self.speed;
+        let speed = if running(app) {
+            self.speed * 2.4
+        } else {
+            self.speed
+        };
+        player.velocity = desired * speed;
         let motion = player.velocity * dt;
 
         // ---- move through the physics world -------------------------------
@@ -501,9 +568,11 @@ impl noxel_app::Plugin for PlayerPlugin {
     }
 
     fn update(&mut self, app: &mut App, dt: f32) {
-        // Scripted by default: the demo has no window, so there is no input
-        // stream. A host that fills `app.input_mut()` can flip this.
-        self.update(app, dt, true);
+        // Scripted by default, and the flag flips itself the moment the host
+        // reports any movement input — so the same binary is a screenshot
+        // generator when nothing is pressed and a game when something is.
+        let scripted = self.scripted;
+        self.update(app, dt, scripted);
         if let Some(player) = self.player.as_ref() {
             app.debug_mut()
                 .record_counter("grounded", f32::from(player.grounded));
@@ -662,5 +731,89 @@ mod tests {
     fn near_agents_are_occluders_and_distant_ones_are_not() {
         assert!(agent_flags(CrowdTier::Near).occluder);
         assert!(!agent_flags(CrowdTier::Far).occluder);
+    }
+}
+
+#[cfg(test)]
+mod input_tests {
+    use super::*;
+    use noxel_app::App;
+
+    fn app() -> App {
+        App::new(noxel_app::AppConfig::headless()).unwrap()
+    }
+
+    #[test]
+    fn movement_reads_wasd_and_the_arrows() {
+        let mut app = app();
+        assert_eq!(read_movement(&app), (0.0, 0.0));
+
+        app.input_mut().press(b'W' as u32);
+        assert_eq!(
+            read_movement(&app),
+            (0.0, -1.0),
+            "w is away from the camera"
+        );
+
+        app.input_mut().release(b'W' as u32);
+        app.input_mut().press(noxel_window::key::RIGHT);
+        assert_eq!(read_movement(&app), (1.0, 0.0), "the right arrow is right");
+    }
+
+    #[test]
+    fn pressing_both_wasd_and_the_arrows_does_not_double_the_speed() {
+        let mut app = app();
+        app.input_mut().press(b'W' as u32);
+        app.input_mut().press(noxel_window::key::UP);
+        assert_eq!(read_movement(&app), (0.0, -1.0), "clamped, not 2.0");
+    }
+
+    #[test]
+    fn shift_is_the_run_modifier() {
+        let mut app = app();
+        assert!(!running(&app));
+        app.input_mut().press(noxel_window::key::SHIFT);
+        assert!(running(&app));
+    }
+
+    #[test]
+    fn touching_the_controls_takes_the_player_off_the_route() {
+        let mut app = app();
+        let mut plugin = PlayerPlugin::new();
+        assert!(plugin.scripted(), "the demo walks itself by default");
+
+        plugin.spawn_at(&mut app, Vec3::ZERO, 0.0);
+        plugin.build_route(&app, Vec3::ZERO, 14.0, 8);
+        app.input_mut().press(b'D' as u32);
+        plugin.update(&mut app, 1.0 / 60.0, true);
+        assert!(!plugin.scripted(), "input wins over the route");
+    }
+
+    #[test]
+    fn letting_go_does_not_hand_control_back() {
+        let mut app = app();
+        let mut plugin = PlayerPlugin::new();
+        plugin.spawn_at(&mut app, Vec3::ZERO, 0.0);
+        plugin.build_route(&app, Vec3::ZERO, 14.0, 8);
+
+        app.input_mut().press(b'W' as u32);
+        plugin.update(&mut app, 1.0 / 60.0, true);
+        app.input_mut().release(b'W' as u32);
+        for _ in 0..30 {
+            plugin.update(&mut app, 1.0 / 60.0, true);
+        }
+        assert!(
+            !plugin.scripted(),
+            "a waypoint must not seize the controls back mid-game"
+        );
+    }
+
+    #[test]
+    fn set_scripted_hands_control_back() {
+        let mut plugin = PlayerPlugin::new();
+        plugin.set_scripted(false);
+        assert!(!plugin.scripted());
+        plugin.set_scripted(true);
+        assert!(plugin.scripted());
     }
 }

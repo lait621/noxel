@@ -13,6 +13,12 @@ publish = false
 name = "town-demo"
 path = "src/main.rs"
 
+[features]
+default = []
+# Off by default, so the example builds and runs with no third-party code. Turn
+# it on for a real window: `cargo run -p town-demo --features window -- --window`.
+window = ["noxel-window/window"]
+
 [dependencies]
 noxel-core.workspace = true
 noxel-ecs.workspace = true
@@ -20,6 +26,7 @@ noxel-asset.workspace = true
 noxel-render.workspace = true
 noxel-camera.workspace = true
 noxel-visibility.workspace = true
+noxel-window.workspace = true
 noxel-physics.workspace = true
 noxel-world.workspace = true
 noxel-npc.workspace = true

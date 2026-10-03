@@ -64,6 +64,15 @@ job. `docs/guides/windowing.md` shows how to attach `winit` or `SDL2` behind an
 optional feature flag, and the `town-demo` example writes PNG frames so the
 engine is fully usable — and fully testable — with no display server at all.
 
+## The one exception
+
+`noxel-window` (see [ADR 0011](0011-windowing.md)) depends on `winit` and
+`softbuffer`, because a window cannot be opened with `std` alone. The dependency
+is **optional, off by default, and confined to that crate**: `cargo build
+--workspace` and `cargo test --workspace` compile none of it and still download
+nothing. The rule for everything else is unchanged, and adding a dependency
+anywhere else needs another ADR.
+
 ## Consequences
 
 - A GPU backend (see ADR 0007) is the one place where a dependency would be

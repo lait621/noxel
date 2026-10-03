@@ -42,6 +42,7 @@
 mod actors;
 mod args;
 mod hud;
+mod interactive;
 mod terrain;
 mod village;
 
@@ -88,7 +89,9 @@ fn main() {
 fn run(args: &Args) -> Result<(), String> {
     // Resolve the two locations a user needs to know about *before* building the
     // app, so the banner can report them whether or not anything was loaded.
-    let dumping = args.dump.is_some();
+    // A windowed run only dumps when asked: writing a PNG per frame while
+    // someone is playing is 60 files a second that nobody wanted.
+    let dumping = args.dump.is_some() && (!args.window || args.dump_given);
     let dump_dir = dump_root(args);
     let assets = asset_root();
     let mut app = build_app(args, &assets)?;
@@ -96,6 +99,10 @@ fn run(args: &Args) -> Result<(), String> {
     if args.world_info {
         print_world_info(&mut app, args);
         return Ok(());
+    }
+
+    if args.window {
+        return run_in_window(args, app);
     }
 
     let terrain_plugin = TerrainPlugin::new();
@@ -153,7 +160,9 @@ fn run(args: &Args) -> Result<(), String> {
 /// Builds the app: assets, world settings, camera, lighting and debug.
 fn build_app(args: &Args, root: &std::path::Path) -> Result<App, String> {
     // `--no-dump` leaves `args.dump` as `None`; resolve once and reuse.
-    let dumping = args.dump.is_some();
+    // A windowed run only dumps when asked: writing a PNG per frame while
+    // someone is playing is 60 files a second that nobody wanted.
+    let dumping = args.dump.is_some() && (!args.window || args.dump_given);
     let dump_dir = dump_root(args);
     let mut config = AppConfig {
         seed: args.seed,
@@ -310,6 +319,45 @@ fn dump_root(args: &Args) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("frames"));
     let _ = std::fs::create_dir_all(&fallback);
     fallback
+}
+
+/// Opens a window and hands the app to it.
+///
+/// This is the whole difference between the demo and a game: the same `App`, the
+/// same plugins, the same scene — driven by real time and real input instead of
+/// by a frame counter.
+fn run_in_window(args: &Args, app: App) -> Result<(), String> {
+    if !args.quiet {
+        println!("town-demo — seed {:#x}, windowed", args.seed);
+        println!("  {} {}", app.renderer_name(), describe_mode(args.mode));
+        println!(
+            "  internal {}x{}, {} NPCs",
+            args.size.0, args.size.1, args.npcs
+        );
+        println!();
+        println!("  WASD or the arrow keys   walk");
+        println!("  shift                    run");
+        println!("  F1                       toggle the statistics overlay");
+        println!("  F8                       write the current frame to a PNG");
+        println!("  escape                   quit");
+        if args.frames != Args::default().frames {
+            println!();
+            println!(
+                "  (--frames {}: the window closes after that many frames)",
+                args.frames
+            );
+        }
+    }
+    let started = Instant::now();
+    interactive::run(args, app).map_err(|e| e.to_string())?;
+    if !args.quiet {
+        println!();
+        println!(
+            "window closed after {:.1}s",
+            started.elapsed().as_secs_f32()
+        );
+    }
+    Ok(())
 }
 
 /// Makes a path absolute for display, without requiring it to exist.

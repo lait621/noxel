@@ -28,6 +28,10 @@ cargo test --workspace
 step "documentation"
 cargo doc --workspace --no-deps
 
+step "the window feature still builds"
+# Not part of the default build: this is the one place that compiles winit.
+cargo check -p town-demo --features window
+
 step "generated assets are up to date"
 cargo run --release -q -p noxel-gen -- verify
 

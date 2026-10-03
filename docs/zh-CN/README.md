@@ -37,6 +37,13 @@ Noxel 从俯视相机渲染一个 3D 世界，内部以像素风分辨率（默�
 
 ## 快速开始
 
+**在窗口里玩**（需要 `window` feature，见 [ADR 0011](adr/0011-窗口.md)）：
+
+```bash
+./scripts/run-window.sh                # WASD 或方向键行走，shift 奔跑，escape 退出
+./scripts/run-window.sh --mode hybrid  # 带光线追踪阴影
+```
+
 **运行预构建的示例**（`dist/` 构建好之后就不需要 Rust 工具链了）：
 
 ```bash

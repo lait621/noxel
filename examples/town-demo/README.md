@@ -26,11 +26,36 @@ crowd, follow the player with a top-down camera, and write every frame as a PNG.
 | Lighting | ambient sky/ground, a low sun, and linear distance fog |
 | Debug output | counters and section budgets in `noxel-debug`, a final report, and PNG dumps |
 
-## Commands
+## Play it in a window
+
+Add the `window` feature and the same binary opens a real window:
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
+cargo run -p town-demo --features window -- --window
+# or, equivalently: ./scripts/run-window.sh
+```
 
+| Key | Action |
+|---|---|
+| `W A S D` or the arrow keys | walk |
+| `shift` | run |
+| `F1` | toggle the statistics overlay |
+| `F8` | write the current frame to a PNG |
+| `escape` | quit |
+
+The demo walks itself along a scripted route until you touch the controls. From
+that moment it is yours, and it never takes them back — there is no mode flag,
+input simply wins. So the same binary is a CI frame generator and a game, and
+`PlayerPlugin::set_scripted(false)` is there for a game that wants a menu.
+
+The `window` feature is what pulls in `winit` and `softbuffer`; it is off by
+default, so a plain `cargo build` still downloads nothing
+([ADR 0011](../../docs/adr/0011-windowing.md)).
+
+## Render frames headlessly
+
+```bash
 cargo run -p town-demo -- --frames 300 --dump frames
 cargo run -p town-demo -- --mode hybrid --npcs 400
 cargo run -p town-demo -- --stats            # one settled frame, full statistics

@@ -1,7 +1,17 @@
 # Attaching a window
 
-Noxel has no windowing layer. `App` produces a linear HDR `Framebuffer` and
-consumes an `InputState`; presenting that buffer is the host's job. This is a
+> **Update.** The engine now ships this. `crates/noxel-window` is a real crate
+> with a `window` feature that opens a window, presents the framebuffer and reads
+> player input — see [ADR 0011](../adr/0011-windowing.md) and run
+> `./scripts/run-window.sh`. Use this guide when you want your *own* host instead:
+> a different toolkit, a custom loop, or an embedded target. Everything below is
+> about the seam, which is the same either way.
+
+
+The engine has no *built-in* windowing layer: `App` produces a linear HDR
+`Framebuffer` and consumes an `InputState`, and presenting that buffer is the
+host's job. That is still true of every crate except `noxel-window`, which is one
+such host, written and shipped so you do not have to write the first one. This is a
 consequence of `adr/0002-no-dependencies.md`: a window needs a platform API, and
 the engine will not carry one for every platform it might run on.
 
