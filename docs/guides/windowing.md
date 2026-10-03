@@ -45,6 +45,16 @@ Three things to get right, and they are all easy to get wrong:
 
 ## The loop
 
+> **Pace it.** A loop that starts the next frame the moment the last one finished
+> renders as fast as the CPU allows, which on a platform whose compositor does
+> not block the caller means 100% of a core at any frame rate — see
+> [ADR 0015](../adr/0015-frame-pacing.md). `noxel-window` does this for you
+> (`WindowConfig::target_fps`, default 60) and exposes the arithmetic as
+> `FramePacer`, so a hand-written host can do the same: sleep until
+> `pacer.wait_for(Instant::now())` has elapsed, then `pacer.mark(Instant::now())`
+> once the frame is presented. Run flat out only when measuring, where the frame
+> rate is the answer rather than a cost.
+
 ```rust,no_run
 use noxel_app::{App, AppConfig};
 use noxel_render::framebuffer::ResolveSettings;

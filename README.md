@@ -5,7 +5,8 @@ written in Rust with **no third-party dependencies**.
 
 ```text
 $ cargo run -p town-demo                # generate a world, walk a town, write PNG frames
-$ cargo test --workspace                # 1690 tests, a few seconds, no display needed
+$ cargo test --workspace                # 1656 tests, a few seconds, no display needed
+$ cargo test --workspace --all-features # 1664, adding the window host's own tests
 $ cargo run -p noxel-gen -- generate    # regenerate every asset in examples/town-demo/assets
 ```
 
@@ -127,6 +128,22 @@ attach `winit` or `SDL2` to present the framebuffer.
 
 ---
 
+## Performance, and the two numbers that bite
+
+The engine is a CPU renderer, so the two things that go wrong in a real game are
+frame *cost* and frame *rate* — and they are not the same problem.
+
+| | What the engine does about it |
+|---|---|
+| **A window that is never idle** | `noxel-window` paces itself to `WindowConfig::target_fps` (60 by default) and sleeps between frames. A host that asks for the next frame the instant the last one finished renders as fast as the CPU allows — 100% of a core at any frame rate. `FramePacer` is public, for a hand-written host. See [ADR 0015](docs/adr/0015-frame-pacing.md). |
+| **A scene that grows every frame** | `Scene::replace_mesh` rebuilds geometry in place, `Scene::despawn` releases an instance *and* its mesh, and `App` records `meshes` / `mesh mem KB` on the overlay every frame. `add_mesh` + `remove_instance` — which looks like an update and is a leak — is written up in [ADR 0016](docs/adr/0016-mesh-lifetime.md) and in the [field notes](docs/field-notes.md). |
+| **`powf` in the inner loop** | Every texture is sRGB bytes, so decoding one is one of 256 conversions: `Color8::to_linear_tabulated` reads a table built by the same function. Computing them cost about a fifth of the farming game's frame. |
+
+`docs/08-performance.md` has the levers, the numbers, and how to write a
+performance test that does not fail on a slower machine.
+
+---
+
 ## Architecture
 
 ```text
@@ -201,6 +218,9 @@ that shape everything else:
 | [0009](docs/adr/0009-no-ui.md) | No UI toolkit — superseded by 0012 |
 | [0012](docs/adr/0012-ui-layer.md) | A UI layer, as a crate, with a deliberately narrow boundary |
 | [0013](docs/adr/0013-audio.md) | Audio, and a second exception to the dependency rule |
+| [0014](docs/adr/0014-weather.md) | Weather as a world-space system, not a screen-space effect |
+| [0015](docs/adr/0015-frame-pacing.md) | The window host paces itself; a redraw request is not a frame budget |
+| [0016](docs/adr/0016-mesh-lifetime.md) | Geometry has an owner: `replace_mesh`, `despawn`, and a per-frame memory counter |
 | [0010](docs/adr/0010-testing-strategy.md) | Every invariant has a test; a failing test means deciding whether the code or the test is wrong |
 
 ---

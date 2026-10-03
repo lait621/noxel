@@ -136,6 +136,51 @@ Two levers that look like performance knobs but are not:
 - **`temporal_blend`** in the ray tracer trades frames for samples, not quality
   for speed. It is the right lever for a still, not for gameplay.
 
+### Three things that are already done, and where they are
+
+Worth knowing before optimizing them again:
+
+| | Where | What it saved |
+|---|---|---|
+| **Tabulated sRGB decode** | `noxel_core::math::srgb8_to_linear_table`, used by the rasterizer, the ray tracer and the UI painter | A textured fragment decodes three bytes; computing them with `powf` was **about a fifth of the frame**. The table is built from the same function, so a lookup is bit-identical to the arithmetic. |
+| **Frame pacing** | `WindowConfig::target_fps` (default 60), `FramePacer` | A windowed host that asked for a redraw the moment the last frame finished rendered as fast as the CPU allowed: **100% of a core, forever**, at any frame rate. Pacing took the farming game to 57% and a trivial demo to nearly nothing. |
+| **A banded presentation blit** | `noxel-window`'s `blit` | Every destination row in a band of `scale` rows samples the same source row, so the row is packed once and copied. The blit was the most expensive function in a presented frame. |
+
+Two more numbers worth having in your head, both measured at 480x270 on an M-series
+laptop with `--release`:
+
+- `Framebuffer::resolve` — the sRGB encode, tone curve and dither for a whole
+  frame — is **~1.6 ms**. It runs once per presented frame and never in a
+  headless run. A host that resolves twice per frame has just spent 1.6 ms.
+- One `Color8::to_linear` per texel is **6.3 ns**; the tabulated version is
+  **0.96 ns**. The ratio is what makes a table worth having; the absolute value
+  is what a fragment's remaining budget looks like.
+
+## Memory: the counter to watch
+
+`App` records two scene counters every frame, next to the chunk counters:
+
+| Counter | What it is |
+|---|---|
+| `meshes` | how many meshes the scene owns |
+| `mesh mem KB` | their vertex and index data, in kilobytes |
+
+They are there because they were missing. A game that rebuilds geometry with
+`add_mesh` + `remove_instance` instead of `Scene::replace_mesh` leaks one mesh
+per rebuild — hundreds of kilobytes a frame, gigabytes a minute, with every other
+number on the overlay looking healthy
+([ADR 0016](adr/0016-mesh-lifetime.md), and the trap is written up in
+[the field notes](field-notes.md)). A **climbing** line here is a bug in the
+caller, not a tuning problem, and no lever in the table above will help.
+
+The three calls that own geometry:
+
+```rust
+scene.replace_mesh(handle, mesh);   // rebuild in place: no new mesh, handles survive
+scene.despawn(instance);            // instance and its mesh, unless it is shared
+scene.prune_unused_meshes();        // every mesh nothing references (explicit!)
+```
+
 ## Writing a performance test that is not flaky
 
 A test that asserts a *duration* measures the machine, not the code. It passes on
@@ -148,7 +193,9 @@ your laptop, fails in CI, and tells you nothing when it fails. Assert an
 | "frames take 4 ms" | `report.within_budget(16.67)` on p95, and `report.fragments` inside a known range |
 | "streaming is fast" | `stats.generated_this_update == 13 * 13` on the first update and `0` on the second |
 | "memory does not grow" | `streamer.memory_bytes()` below a bound after a 40-step walk |
+| "rebuilding is free" | `scene.mesh_count()` and `scene.mesh_bytes()` unchanged after 100 rebuilds |
 | "the world is stable" | two generation orders produce equal bytes |
+
 
 The suite already contains the patterns to copy:
 

@@ -160,6 +160,80 @@ the committed PNGs were stale relative to the final code — the JSON matched (s
 every region name and size was right) and three PNGs did not. Names and sizes
 matching is not the same as pixels matching.
 
+### A mesh rebuilt every frame is a mesh leaked every frame
+
+**Symptom.** The game runs, at a perfectly reasonable frame rate, and the
+process grows from 13 MB to 850 MB in fourteen seconds and keeps climbing. No
+error, no warning, nothing in the log. Task manager says 1.2 GB and climbing by
+the time anyone looks.
+
+**Cause.** Two mistakes stacked, and either one alone is harmless.
+
+```rust
+// 1. The guard never matched. `key` is what the branch above compares against.
+self.built_revision = self.map.revision();     // ...instead of `key`
+
+// 2. Replacing an instance's geometry looked like replacing the geometry.
+let handle = app.scene_mut().add_mesh(mesh);   // a new mesh, every rebuild
+let instance = app.scene_mut().spawn("farm.ground", handle, material, IDENTITY);
+self.release(app, self.ground_instance);       // remove_instance: keeps the mesh
+```
+
+`Scene::remove_instance` deliberately keeps the mesh — that is what lets several
+instances share one prefab — so the old farm was still in the arena, forever,
+three meshes at a time, sixty times a second. **Half a millisecond of work per
+frame and a megabyte per second of memory.**
+
+**Why it cost so long.** Every measurement that was easy to take was healthy.
+Frame time: fine. Triangles drawn: fine. Entity counts: fine. Culling: fine. The
+one number that was growing — the scene's mesh bytes — was recorded nowhere, so
+nobody could see it.
+
+**Do this.**
+
+* Replace geometry with `Scene::replace_mesh(handle, mesh)`. The handles, the
+  instances and their bounds all survive; nothing is added.
+* Release geometry with `Scene::despawn(instance)`, which takes the instance
+  *and* the mesh when it was the last user. Use `remove_instance` when the mesh
+  is shared on purpose.
+* Read `meshes` and `mesh mem KB` on the debug overlay — `App` records both
+  every frame. A line that climbs is the bug.
+* Assert it: a test that rebuilds a hundred times and checks `scene.mesh_count()`
+  is one line and catches the whole class.
+
+**The general rule.** In an arena, the `remove` that looks like the pair of your
+`add` is not always the one that frees. Check which call owns the memory before
+writing the loop, and put the counter that would show it on the screen.
+
+### A redraw request is not a frame budget
+
+**Symptom.** Playing pins a CPU core at 100% — while standing still, while the
+window is in the background, while a menu is open. The fan comes on. The frame
+time is fine, and the frame *rate* is enormous: 300 fps for a game that wants 60.
+
+**Cause.**
+
+```rust
+fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+    window.request_redraw();     // and again as soon as the frame finishes
+}
+```
+
+`request_redraw` does not wait for anything. On a platform whose compositor does
+not block the caller, the loop renders as fast as the CPU allows. Nothing is
+wrong with any frame; there are just three hundred of them a second.
+
+**Do this.** Pace the host: sleep until the next frame is due
+(`ControlFlow::WaitUntil`) and align the deadline to a grid rather than to the
+end of the last frame — otherwise every millisecond of work is added to the
+period and the frame rate sags away from the target. `noxel-window` does this by
+default (`WindowConfig::target_fps`), and `FramePacer` is public so a hand-written
+host can do the same. Run flat out only when measuring.
+
+**The general rule.** A loop that asks for more work the instant it finishes will
+always consume everything available. "It runs fine" and "it is using a whole
+core" are different claims, and the second one is what the fans report.
+
 ---
 
 ## Techniques
