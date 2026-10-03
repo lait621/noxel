@@ -1,5 +1,10 @@
 # Contributing as an AI agent
 
+> **Read [`field-notes.md`](field-notes.md) first.** It is the accumulated cost of
+> building a real game on this engine: the traps that produce no error message,
+> the techniques that worked, and the verification habits that would have caught
+> most of it. This document is the rules; that one is the experience.
+
 This repository is written substantially by AI agents, one crate at a time, in
 parallel. That workflow has one dominant failure mode: **code that compiles,
 looks plausible, and is subtly wrong**. This document is the operating manual for

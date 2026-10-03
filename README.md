@@ -223,6 +223,7 @@ under `docs/zh-CN/` — start at [`docs/zh-CN/文档索引.md`](docs/zh-CN/文�
 | [`docs/07-npcs.md`](docs/07-npcs.md) | Crowd tiers, pathfinding, steering, schedules, and how to hit 1000 NPCs |
 | [`docs/08-performance.md`](docs/08-performance.md) | Where the time goes and how to measure it |
 | [`docs/api/`](docs/api) | Per-crate API reference |
+| [`docs/field-notes.md`](docs/field-notes.md) | **Start here.** The traps, the techniques and the process lessons from building a game on this engine |
 | [`docs/contributing-for-ai.md`](docs/contributing-for-ai.md) | How to work on this codebase, written for an AI agent |
 | [Noxel Valley](https://github.com/lait621/Noxel-valley) | The game built on this engine, in its own repository |
 
