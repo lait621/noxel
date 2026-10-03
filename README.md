@@ -1,4 +1,4 @@
-# Noxel
+# ![Noxel](tools/logo/noxel-64.png) Noxel
 
 A lightweight, modular, high-performance **3D top-down pixel-art RPG engine**,
 written in Rust with **no third-party dependencies**.
