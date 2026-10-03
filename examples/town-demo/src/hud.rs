@@ -155,7 +155,7 @@ pub fn final_report(app: &App, args: &Args, wall_seconds: f32) -> String {
     );
     let _ = writeln!(
         out,
-        "  * `docs/02-getting-started.md` to attach a window and real input"
+        "  * `./scripts/run-window.sh` to play it: WASD to walk, shift to run"
     );
     out
 }
