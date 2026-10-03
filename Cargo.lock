@@ -714,6 +714,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxel-ui"
+version = "0.1.0"
+dependencies = [
+ "noxel-asset",
+ "noxel-core",
+ "noxel-render",
+]
+
+[[package]]
+name = "noxel-valley"
+version = "0.1.0"
+dependencies = [
+ "noxel-app",
+ "noxel-asset",
+ "noxel-camera",
+ "noxel-core",
+ "noxel-debug",
+ "noxel-render",
+ "noxel-ui",
+ "noxel-window",
+]
+
+[[package]]
 name = "noxel-visibility"
 version = "0.1.0"
 dependencies = [

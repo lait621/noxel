@@ -1,0 +1,20 @@
+[package]
+name = "noxel-ui"
+description = "Noxel's immediate-mode UI layer: crisp bitmap text, nine-slice frames, layout and widgets."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# Exposes `noxel_ui::testfont`, an in-memory font with no asset files. Off by
+# default: a game turns it on for its own tests, where needing a baked atlas on
+# disk would mean the tests only pass after `tools/fontgen` has run.
+test-support = []
+
+[dependencies]
+noxel-core.workspace = true
+noxel-asset.workspace = true
+noxel-render.workspace = true

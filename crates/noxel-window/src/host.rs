@@ -141,6 +141,16 @@ impl<H: Host> ApplicationHandler for Handler<H> {
                 self.input.mouse = next;
                 self.input.mouse_delta.0 += next.0 - previous.0;
                 self.input.mouse_delta.1 += next.1 - previous.1;
+                // A game hit-tests in framebuffer pixels, so the host converts
+                // here rather than leaving every caller to redo the arithmetic.
+                let presentation =
+                    self.config
+                        .presentation(self.window.as_ref().map_or((1, 1), |w| {
+                            let size = w.inner_size();
+                            (size.width.max(1), size.height.max(1))
+                        }));
+                self.input.cursor = presentation.cursor_to_framebuffer(next);
+                self.input.cursor_inside = presentation.contains_cursor(next);
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 let slot = match button {
@@ -149,7 +159,10 @@ impl<H: Host> ApplicationHandler for Handler<H> {
                     MouseButton::Right => 2,
                     _ => return,
                 };
-                self.input.mouse_buttons[slot] = state == ElementState::Pressed;
+                match state {
+                    ElementState::Pressed => self.input.press_mouse(slot),
+                    ElementState::Released => self.input.release_mouse(slot),
+                }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 self.input.scroll += match delta {
@@ -221,13 +234,9 @@ impl<H: Host> Handler<H> {
             return;
         };
 
-        let scale = if self.config.pixel_perfect {
-            let sx = width / self.config.internal.0.max(1);
-            let sy = height / self.config.internal.1.max(1);
-            sx.min(sy).max(1)
-        } else {
-            0 // zero means "stretch"
-        };
+        // The same `Presentation` the cursor is mapped through, so the image and
+        // the pointer can never disagree about where the framebuffer is.
+        let presentation = self.config.presentation((width, height));
         blit(
             &image.pixels,
             image.width,
@@ -235,7 +244,7 @@ impl<H: Host> Handler<H> {
             &mut buffer,
             width,
             height,
-            scale,
+            presentation.scale,
             self.config.background,
         );
         // A failed present is worth hearing about exactly once, and never worth

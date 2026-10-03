@@ -13,8 +13,10 @@ members = [
     "crates/noxel-npc",
     "crates/noxel-debug",
     "crates/noxel-app",
+    "crates/noxel-ui",
     "tools/noxel-gen",
     "examples/town-demo",
+    "games/noxel-valley",
 ]
 
 [workspace.package]
@@ -40,6 +42,7 @@ noxel-physics = { path = "crates/noxel-physics", version = "0.1.0" }
 noxel-world = { path = "crates/noxel-world", version = "0.1.0" }
 noxel-npc = { path = "crates/noxel-npc", version = "0.1.0" }
 noxel-debug = { path = "crates/noxel-debug", version = "0.1.0" }
+noxel-ui = { path = "crates/noxel-ui", version = "0.1.0" }
 noxel-app = { path = "crates/noxel-app", version = "0.1.0" }
 noxel-window = { path = "crates/noxel-window", version = "0.1.0", default-features = false }
 

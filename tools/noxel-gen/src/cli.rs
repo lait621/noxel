@@ -1,13 +1,14 @@
 //! Command-line parsing.
 //!
 //! Hand-rolled: the crate has no third-party dependencies, and the surface is
-//! four subcommands and four flags, so a parser is smaller than the argument
+//! five subcommands and four flags, so a parser is smaller than the argument
 //! parsing crate it would replace.
 //!
 //! ```text
 //! noxel-gen generate [--out DIR] [--seed N] [--force]
 //! noxel-gen verify   [--out DIR]
 //! noxel-gen preview  [--out DIR] [--scale N]
+//! noxel-gen farm     --out DIR [--scale N]
 //! noxel-gen list
 //! ```
 
@@ -23,21 +24,29 @@ USAGE:
     noxel-gen generate [--out DIR] [--seed N] [--force]
     noxel-gen verify   [--out DIR]
     noxel-gen preview  [--out DIR] [--scale N]
+    noxel-gen farm     --out DIR [--scale N]
     noxel-gen list
 
 COMMANDS:
     generate    Write every asset, skipping files whose bytes are unchanged.
     verify      Regenerate in memory and compare against the files on disk.
     preview     Write a contact sheet of the textures to <out>/preview.png.
+    farm        Write the farm atlas set to <out>/farm: terrain, crops, props,
+                characters, ui, each a PNG plus its atlas JSON, plus a contact
+                sheet. The farm set is additive: `generate` neither writes nor
+                checks it.
     list        Print the manifest: every generated file, its kind and size.
 
 OPTIONS:
     --out DIR   Asset root. Defaults to examples/town-demo/assets inside the
-                workspace, found by walking up from the crate directory.
+                workspace, found by walking up from the crate directory. `farm`
+                has no default and always needs it, so that generating a farm
+                never touches the demo's asset tree by accident.
     --seed N    Generation seed (default 0x4E4F58454C). Only changes the
                 procedural detail scatter, never a file's identity.
     --force     generate: rewrite every file even when it is up to date.
-    --scale N   preview: integer upscale of the contact sheet (default 4).
+    --scale N   preview and farm: integer upscale of the contact sheet
+                (default 4 for preview, 3 for farm).
     -h, --help  Print this text.
 ";
 
@@ -63,6 +72,13 @@ pub enum Command {
         /// Asset root; the sheet is written next to the textures.
         out: PathBuf,
         /// Integer upscale factor.
+        scale: u32,
+    },
+    /// Write the farm atlas set into `<out>/farm`.
+    Farm {
+        /// Asset root; the farm set goes in a `farm` directory under it.
+        out: PathBuf,
+        /// Integer upscale of the contact sheet.
         scale: u32,
     },
     /// Print the manifest of everything the generator writes.
@@ -106,6 +122,9 @@ pub fn parse(args: &[String]) -> Result<Command> {
         }
     }
 
+    // `farm` is the one command that will not guess an asset root: its output
+    // is a new tree, and the default root is the demo's shipped assets.
+    let out_given = out.is_some();
     let out = match out {
         Some(path) => path,
         None => default_out_dir()?,
@@ -141,6 +160,23 @@ pub fn parse(args: &[String]) -> Result<Command> {
             Ok(Command::Preview {
                 out,
                 scale: scale.unwrap_or(DEFAULT_PREVIEW_SCALE),
+            })
+        }
+        "farm" => {
+            if !out_given {
+                return Err(Error::usage(format!(
+                    "`farm` needs an explicit `--out DIR`\n\n{USAGE}"
+                )));
+            }
+            if seed.is_some() {
+                return Err(Error::usage("`--seed` is only valid for `generate`"));
+            }
+            if force {
+                return Err(Error::usage("`--force` is only valid for `generate`"));
+            }
+            Ok(Command::Farm {
+                out,
+                scale: scale.unwrap_or(crate::farm::DEFAULT_PREVIEW_SCALE),
             })
         }
         "list" => {

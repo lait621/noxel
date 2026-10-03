@@ -22,16 +22,19 @@ it in this list and nothing below it, and there are no cycles.
 | 2 | `noxel-render` | core, asset |
 | 2 | `noxel-world` | core, asset |
 | 3 | `noxel-camera` | core, render |
+| 3 | `noxel-ui` | core, asset, render |
 | 3 | `noxel-debug` | core, asset, render |
 | 4 | `noxel-visibility` | core, ecs, render, camera |
 | 5 | `noxel-npc` | core, ecs, physics, world |
 | 6 | `noxel-app` | all of the above |
 | — | `tools/noxel-gen` | core, asset |
 | — | `examples/town-demo` | all of the above |
+| — | `games/noxel-valley` | all of the above |
 
 ```text
 core ─┬─ ecs ─────────────────────────────┐
       ├─ asset ─┬─ render ─┬─ camera ─────┤
+      │         │          ├─ ui ─────────┤
       │         │          ├─ debug       │
       │         └─ world ──┼─ npc ────────┤
       └─ physics ──────────┘              └── app
@@ -74,7 +77,7 @@ Every crate's `lib.rs` starts with:
 | zero third-party dependencies | `[workspace.dependencies]` lists only Noxel crates and `std`. No `serde`, no `glam`, no `rand`, no `rayon` — see `docs/adr/0002-no-dependencies.md`. A GPU backend is *specified* as feature-gated (`docs/adr/0007-gpu-backend.md`) but no `[features]` table exists yet |
 | edition 2024, `rust-version` 1.85 | `rust-toolchain.toml` pins `stable` with `rustfmt` and `clippy`. Edition 2024 makes `gen` a reserved keyword (see the pitfalls) |
 | `rustfmt.toml` | `max_width = 100`, `hard_tabs = false`, `tab_spaces = 4`, Unix newlines, `reorder_imports`, `use_small_heuristics = "Default"` |
-| no UI toolkit | `docs/adr/0009-no-ui.md`: no menus, no layout engine, no editor. `noxel-render::overlay` draws text and lines; it does not route input or lay anything out |
+| no application framework | `docs/adr/0012-ui-layer.md`: `noxel-ui` draws, hit-tests and lays out; it has no screen stack, no retained widget tree, no layout engine and no text input. A screen is the game's own enum, and the UI cannot acquire one |
 | determinism | no renderer, sampling, generation or NPC code may read a clock, a thread id or a global RNG — `docs/adr/0008-deterministic-rendering.md` and `docs/adr/0006-deterministic-generation.md` |
 
 The build profiles matter when you are reasoning about performance:
@@ -218,6 +221,9 @@ Each of these has cost someone real time in this codebase.
 | **Half the `FrameSample` fields are unfilled** | `release`, `visibility_ms`, `stream_ms`, `npc_ms` and `physics_ms` exist but nothing in the engine writes them; a game fills them through the budgets named `physics`, `visibility`, `stream` and `npc` |
 | **`--all-targets` is the only honest check** | `cargo check --workspace` compiles the libraries and skips every test and example target, so it will happily pass while `cargo test` fails to build. Use `cargo clippy --workspace --all-targets -- -D warnings`, which is what CI runs. |
 | **`tools/noxel-gen` writes byte-stable output** | JSON keeps the author's key order, atlas packing sorts by height then name, and PNG encoding is a fixed algorithm. A change that reorders keys or entries produces a huge diff for no reason |
+| **A quad's winding decides whether you see it** | The rasterizer culls backfaces and the game camera looks straight down, so a ground quad wound `(x0,z0) -> (x1,z0) -> (x1,z1)` has a normal of `-Y` and the entire world is invisible — with no error anywhere. `world.rs` has a test that asserts every ground triangle faces up |
+| **A font offset is measured from the baseline, for every face** | `noxel-ui` puts several faces on one baseline by shifting each glyph by `line_baseline - face_baseline`. A bake that folds the face's own baseline into the glyph offset gets that shift applied twice, and Latin text sinks below the Chinese beside it. `tools/fontgen/README.md` has the arithmetic |
+| **`Color8::WHITE` as a tint means "draw the texel as authored"** | Not "multiply by one". The two agree on white coverage glyphs and disagree on coloured art: a nine-slice drawn with a white tint once came out blank while its corners stayed correct, because only the stretched pieces used the tint as the colour |
 
 ## Definition of done
 

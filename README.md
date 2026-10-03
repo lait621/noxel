@@ -5,9 +5,20 @@ written in Rust with **no third-party dependencies**.
 
 ```text
 $ cargo run -p town-demo                # generate a world, walk a town, write PNG frames
-$ cargo test --workspace                # 1475 tests, a few seconds, no display needed
+$ cargo test --workspace                # 1690 tests, a few seconds, no display needed
 $ cargo run -p noxel-gen -- generate    # regenerate every asset in examples/town-demo/assets
 ```
+
+**There is a game.** `games/noxel-valley` is a playable top-down farming game
+built on the engine, and the reference project for its UI layer:
+
+```text
+$ cargo run -p noxel-valley --features window -- --window   # play it
+$ open dist/Noxel\ Valley.app                              # or just double-click it
+```
+
+See [games/noxel-valley/README.md](games/noxel-valley/README.md) for what it does,
+how it is put together and what it is still bad at.
 
 ---
 
@@ -31,7 +42,8 @@ moving: top-down RPGs, colony sims, tactical games, anything with a crowd.
 | Both rasterization and ray tracing | [`noxel-render`](crates/noxel-render) — three modes over one scene |
 | Large numbers of simultaneous NPCs | [`noxel-npc`](crates/noxel-npc) — crowd tiers, flow-field pathfinding, steering |
 | Modular and extensible | One crate per subsystem, one `Renderer` trait, one `Plugin` trait |
-| Detailed documentation instead of UI | `docs/` — overview, guides, API, 10 ADRs |
+| A game UI on top of the renderer | [`noxel-ui`](crates/noxel-ui) — bitmap text with face fallback, nine-slice frames, layout, widgets |
+| Detailed documentation instead of UI | `docs/` — overview, guides, API, 12 ADRs |
 
 ---
 
@@ -159,10 +171,13 @@ design error, not a compile error you can work around.
 | `noxel-physics` | bodies, SAT narrowphase, sequential-impulse solver, character controller, queries |
 | `noxel-world` | deterministic terrain, biomes, road lattice, towns, chunk streaming, prefabs |
 | `noxel-npc` | crowd tiers, flow-field and A* pathfinding, steering, daily schedules |
+| `noxel-ui` | bitmap text with per-script fallback, clipped nine-slice drawing, integer layout, widgets |
 | `noxel-debug` | rolling statistics, section budgets, overlays, headless frame dumping, image diff |
 | `noxel-app` | `App`, `AppContext`, `Plugin`, the fixed-timestep frame loop |
-| `tools/noxel-gen` | the asset generator: textures, atlases, tilesets, prefabs, the palette |
+| `tools/noxel-gen` | the asset generator: textures, atlases, tilesets, prefabs, the palette, and the farm art |
+| `tools/fontgen` | the UI font bake: a hand-drawn Latin face plus the GB2312 common characters |
 | `examples/town-demo` | a ready-to-run village with a player, NPCs, physics and dumped frames |
+| `games/noxel-valley` | a playable farming game: farming, time, weather, trade, and a full game UI |
 
 ---
 
@@ -181,7 +196,8 @@ that shape everything else:
 | [0006](docs/adr/0006-deterministic-generation.md) | The world is a pure function of `(seed, address)` — no shared RNG anywhere |
 | [0007](docs/adr/0007-gpu-backend.md) | The GPU backend is specified and feature-gated, not implemented |
 | [0008](docs/adr/0008-deterministic-rendering.md) | Rendering is deterministic, which is what makes golden-image tests possible |
-| [0009](docs/adr/0009-no-ui.md) | No UI toolkit — a debug overlay and documentation instead |
+| [0009](docs/adr/0009-no-ui.md) | No UI toolkit — superseded by 0012 |
+| [0012](docs/adr/0012-ui-layer.md) | A UI layer, as a crate, with a deliberately narrow boundary |
 | [0010](docs/adr/0010-testing-strategy.md) | Every invariant has a test; a failing test means deciding whether the code or the test is wrong |
 
 ---
@@ -205,6 +221,7 @@ under `docs/zh-CN/` — start at [`docs/zh-CN/文档索引.md`](docs/zh-CN/文�
 | [`docs/08-performance.md`](docs/08-performance.md) | Where the time goes and how to measure it |
 | [`docs/api/`](docs/api) | Per-crate API reference |
 | [`docs/contributing-for-ai.md`](docs/contributing-for-ai.md) | How to work on this codebase, written for an AI agent |
+| [`games/noxel-valley/README.md`](games/noxel-valley/README.md) | The game: systems, layout, asset pipeline, known weak points |
 
 Regenerate the API docs with `cargo doc --workspace --no-deps --open`.
 

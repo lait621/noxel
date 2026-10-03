@@ -17,6 +17,7 @@
 //! noxel-gen generate [--out DIR] [--seed N] [--force]
 //! noxel-gen verify   [--out DIR]
 //! noxel-gen preview  [--out DIR] [--scale N]
+//! noxel-gen farm     --out DIR [--scale N]
 //! noxel-gen list
 //! ```
 
@@ -28,6 +29,8 @@ mod characters;
 mod cli;
 mod draw;
 mod error;
+mod farm;
+mod farm_preview;
 mod palette;
 mod prefabs;
 mod preview;
@@ -85,6 +88,10 @@ fn run(args: &[String]) -> error::Result<()> {
                 "noxel-gen: preview {width}x{height} (scale {scale}) -> {}",
                 out.join("preview.png").display()
             );
+        }
+        cli::Command::Farm { out, scale } => {
+            let summary = farm::write(&out, scale)?;
+            println!("{}", summary.line(&out));
         }
         cli::Command::List => {
             print!("{}", assets::listing(DEFAULT_SEED)?);

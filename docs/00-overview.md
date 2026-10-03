@@ -17,7 +17,7 @@ Being explicit about the edges saves everyone time.
 | Not this | Because |
 |---|---|
 | A general-purpose 3D engine | Coordinates, camera and lighting all assume a top-down view. It will render a first-person scene, badly and slowly. |
-| A UI toolkit | No menus, no text input, no layout. See `adr/0009-no-ui.md`. |
+| An application framework | `noxel-ui` draws, hit-tests and lays out. It has no screen stack, no retained widget tree, no layout engine and no text input; a screen is the game's own data. See `adr/0012-ui-layer.md`. |
 | A windowing layer | No platform API. You present `Framebuffer` yourself; see `guides/windowing.md`. |
 | A model importer | There is no glTF/OBJ loader. Geometry is procedural primitives and voxel prefabs; detail lives in textures. See `adr/0006`-adjacent notes in `04-rendering.md`. |
 | A scripting host | There is no embedded language. Gameplay is Rust. |
@@ -161,10 +161,12 @@ Two orderings are not arbitrary:
 | `noxel-physics` | bodies, SAT, solver, character controller, queries | core |
 | `noxel-world` | terrain, biomes, roads, towns, streaming, prefabs | core, asset |
 | `noxel-npc` | crowd tiers, A*, flow fields, steering, schedules | core, ecs, physics, world |
+| `noxel-ui` | text with per-script fallback, clipped nine-slice drawing, integer layout, widgets | core, asset, render |
 | `noxel-debug` | statistics, budgets, overlays, frame dumping, image diff | core, render, asset |
 | `noxel-app` | `App`, `Plugin`, the fixed-timestep frame loop | all of the above |
 | `tools/noxel-gen` | the asset generator | core, asset |
 | `examples/town-demo` | a complete village | everything |
+| `games/noxel-valley` | a playable farming game | everything |
 
 Dependencies point **one way only**. That is a rule, not a coincidence: it means
 any crate can be understood by reading it and the crates below it, and no crate

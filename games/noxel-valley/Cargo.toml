@@ -1,0 +1,38 @@
+[package]
+name = "noxel-valley"
+description = "Noxel Valley — a playable top-down farming game built on Noxel, and the reference project for the engine's UI layer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+name = "noxel_valley"
+path = "src/lib.rs"
+
+[[bin]]
+name = "noxel-valley"
+path = "src/main.rs"
+
+[features]
+default = []
+# Off by default so the engine's own `cargo build` still downloads nothing.
+# The shipped game turns it on; see games/noxel-valley/README.md.
+window = ["noxel-window/window"]
+
+[dependencies]
+noxel-core.workspace = true
+noxel-asset.workspace = true
+noxel-render.workspace = true
+noxel-camera.workspace = true
+noxel-window.workspace = true
+noxel-ui.workspace = true
+noxel-debug.workspace = true
+noxel-app.workspace = true
+
+[dev-dependencies]
+# The in-memory font, so the game's tests do not need a baked atlas on disk.
+noxel-ui = { workspace = true, features = ["test-support"] }

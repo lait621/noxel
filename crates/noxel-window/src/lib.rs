@@ -139,6 +139,102 @@ impl WindowConfig {
         let sy = window.1 / self.internal.1.max(1);
         sx.min(sy).max(1)
     }
+
+    /// How a framebuffer of the internal size is placed in a window of `window`
+    /// pixels.
+    ///
+    /// This is the **single source of truth** for the mapping in both directions.
+    /// The presenter uses it to scale the image up, and the input side uses it to
+    /// scale the cursor down; deriving those two separately is how a game ends up
+    /// with a cursor that is off by the letterbox offset — a bug that is invisible
+    /// at one window size and obvious at every other.
+    #[must_use]
+    pub fn presentation(&self, window: (u32, u32)) -> Presentation {
+        let (width, height) = (window.0.max(1), window.1.max(1));
+        let (source_width, source_height) = (self.internal.0.max(1), self.internal.1.max(1));
+        if !self.pixel_perfect {
+            // Stretch to fill: the mapping is the whole window either way.
+            return Presentation {
+                window: (width, height),
+                source: (source_width, source_height),
+                scale: 0,
+                offset: (0, 0),
+            };
+        }
+        let scale = self.integer_scale((width, height));
+        let offset = (
+            ((width - source_width * scale) / 2) as i32,
+            ((height - source_height * scale) / 2) as i32,
+        );
+        Presentation {
+            window: (width, height),
+            source: (source_width, source_height),
+            scale,
+            offset,
+        }
+    }
+}
+
+/// Where a framebuffer sits inside a window, and how the two map onto each other.
+///
+/// Produced by [`WindowConfig::presentation`]; see that method for why the two
+/// directions must share one derivation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Presentation {
+    /// The window size in physical pixels.
+    pub window: (u32, u32),
+    /// The framebuffer size.
+    pub source: (u32, u32),
+    /// The whole-number upscale, or `0` when the image is stretched to fill.
+    pub scale: u32,
+    /// The letterbox offset of the framebuffer's top-left inside the window.
+    pub offset: (i32, i32),
+}
+
+impl Presentation {
+    /// Converts a cursor position in window pixels to framebuffer pixels.
+    ///
+    /// The result may be outside the framebuffer — the letterbox bars are part of
+    /// the window and the cursor genuinely is there. A caller that cares tests
+    /// the result against the framebuffer's bounds rather than clamping, because
+    /// clamping would turn "the pointer left the game" into "the pointer is
+    /// pinned to the edge", and a pinned pointer keeps a widget hovered forever.
+    #[must_use]
+    pub fn cursor_to_framebuffer(&self, cursor: (f32, f32)) -> (f32, f32) {
+        if self.scale == 0 {
+            let (width, height) = (
+                f64::from(self.window.0.max(1)),
+                f64::from(self.window.1.max(1)),
+            );
+            return (
+                (f64::from(cursor.0) * f64::from(self.source.0) / width) as f32,
+                (f64::from(cursor.1) * f64::from(self.source.1) / height) as f32,
+            );
+        }
+        let scale = f32::from(self.scale as u16);
+        (
+            (cursor.0 - self.offset.0 as f32) / scale,
+            (cursor.1 - self.offset.1 as f32) / scale,
+        )
+    }
+
+    /// Whether a cursor position in window pixels is over the framebuffer rather
+    /// than over a letterbox bar.
+    #[must_use]
+    pub fn contains_cursor(&self, cursor: (f32, f32)) -> bool {
+        let (x, y) = self.cursor_to_framebuffer(cursor);
+        x >= 0.0 && y >= 0.0 && x < self.source.0 as f32 && y < self.source.1 as f32
+    }
+
+    /// Where the framebuffer's top-left lands in the window.
+    #[must_use]
+    pub fn drawn_size(&self) -> (u32, u32) {
+        if self.scale == 0 {
+            self.window
+        } else {
+            (self.source.0 * self.scale, self.source.1 * self.scale)
+        }
+    }
 }
 
 /// One frame's worth of player input.
@@ -147,7 +243,7 @@ impl WindowConfig {
 /// into the other field by field, or read this directly. The key codes are
 /// identical too (see [`key`]), so `movement_axis(87, 83, 65, 68)` means WASD in
 /// both.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Input {
     held: Vec<u32>,
     pressed: Vec<u32>,
@@ -160,12 +256,48 @@ pub struct Input {
     pub scroll: f32,
     /// Left, middle, right.
     pub mouse_buttons: [bool; 3],
+    /// Buttons that went down this frame.
+    pub mouse_pressed: [bool; 3],
+    /// Buttons that came up this frame.
+    pub mouse_released: [bool; 3],
+    /// Cursor position in **framebuffer** pixels.
+    ///
+    /// The window host converts it with the same [`Presentation`] it scaled the
+    /// image up with. A UI hit-tests in framebuffer space, so filling a widget's
+    /// rectangle from `mouse` (window pixels) would put every click in the wrong
+    /// place at every window size but one.
+    pub cursor: (f32, f32),
+    /// Whether the cursor is over the framebuffer rather than a letterbox bar.
+    pub cursor_inside: bool,
     /// True while either shift key is held.
     pub shift: bool,
     /// True while either control key is held.
     pub control: bool,
     /// True while either alt/option key is held.
     pub alt: bool,
+}
+
+impl Default for Input {
+    fn default() -> Self {
+        Self {
+            held: Vec::new(),
+            pressed: Vec::new(),
+            released: Vec::new(),
+            mouse: (0.0, 0.0),
+            mouse_delta: (0.0, 0.0),
+            scroll: 0.0,
+            mouse_buttons: [false; 3],
+            mouse_pressed: [false; 3],
+            mouse_released: [false; 3],
+            cursor: (0.0, 0.0),
+            // A cursor that reports "outside" by default would make a headless
+            // run hover nothing, which is the safe direction to be wrong in.
+            cursor_inside: false,
+            shift: false,
+            control: false,
+            alt: false,
+        }
+    }
 }
 
 impl Input {
@@ -252,6 +384,44 @@ impl Input {
         &self.released
     }
 
+    /// Records a mouse button going down.
+    pub fn press_mouse(&mut self, button: usize) {
+        if let Some(slot) = self.mouse_buttons.get_mut(button) {
+            *slot = true;
+        }
+        if let Some(slot) = self.mouse_pressed.get_mut(button) {
+            *slot = true;
+        }
+    }
+
+    /// Records a mouse button coming up.
+    pub fn release_mouse(&mut self, button: usize) {
+        if let Some(slot) = self.mouse_buttons.get_mut(button) {
+            *slot = false;
+        }
+        if let Some(slot) = self.mouse_released.get_mut(button) {
+            *slot = true;
+        }
+    }
+
+    /// True while a mouse button is held.
+    #[must_use]
+    pub fn is_mouse_down(&self, button: usize) -> bool {
+        self.mouse_buttons.get(button).copied().unwrap_or(false)
+    }
+
+    /// True only on the frame a mouse button went down.
+    #[must_use]
+    pub fn was_mouse_pressed(&self, button: usize) -> bool {
+        self.mouse_pressed.get(button).copied().unwrap_or(false)
+    }
+
+    /// True only on the frame a mouse button came up.
+    #[must_use]
+    pub fn was_mouse_released(&self, button: usize) -> bool {
+        self.mouse_released.get(button).copied().unwrap_or(false)
+    }
+
     /// Releases everything, for a focus loss.
     pub fn release_all(&mut self) {
         self.released.extend(self.held.iter().copied());
@@ -265,6 +435,10 @@ impl Input {
         self.released.clear();
         self.mouse_delta = (0.0, 0.0);
         self.scroll = 0.0;
+        // Levels survive, edges do not: a drag depends on `mouse_buttons` still
+        // being true on the next frame, and a click must not repeat.
+        self.mouse_pressed = [false; 3];
+        self.mouse_released = [false; 3];
     }
 }
 
@@ -335,6 +509,145 @@ impl Host for ClearColor {
 
     fn title_suffix(&self) -> String {
         format!("frame {}", self.frames)
+    }
+}
+
+#[cfg(test)]
+mod presentation_tests {
+    use super::*;
+
+    /// A 320x180 framebuffer in a 960x540 window: exactly 3x, no letterbox.
+    fn exact() -> WindowConfig {
+        WindowConfig::default().with_internal(320, 180)
+    }
+
+    #[test]
+    fn an_exact_multiple_has_no_letterbox_offset() {
+        let presentation = exact().presentation((960, 540));
+        assert_eq!(presentation.scale, 3);
+        assert_eq!(presentation.offset, (0, 0));
+        assert_eq!(presentation.drawn_size(), (960, 540));
+    }
+
+    #[test]
+    fn the_offset_is_half_the_remaining_space_so_the_image_is_centred() {
+        // 3x of 320x180 is 960x540 inside 1000x600: 40 spare horizontally, 60
+        // vertically, so the image starts at (20, 30).
+        let presentation = exact().presentation((1000, 600));
+        assert_eq!(presentation.scale, 3);
+        assert_eq!(presentation.offset, (20, 30));
+    }
+
+    #[test]
+    fn the_cursor_mapping_inverts_the_upscale_and_the_offset() {
+        let presentation = exact().presentation((1000, 600));
+        // The top-left pixel of the image maps back to framebuffer (0, 0).
+        let origin = presentation.cursor_to_framebuffer((20.0, 30.0));
+        assert_eq!(origin, (0.0, 0.0));
+        // One window pixel further right is a third of a framebuffer pixel.
+        let stepped = presentation.cursor_to_framebuffer((23.0, 33.0));
+        assert!((stepped.0 - 1.0).abs() < 1e-5, "{stepped:?}");
+        assert!((stepped.1 - 1.0).abs() < 1e-5, "{stepped:?}");
+    }
+
+    #[test]
+    fn a_cursor_in_the_letterbox_is_outside_the_framebuffer() {
+        // Clamping instead of reporting the truth would pin the pointer to the
+        // edge and keep a widget hovered while the player is in the black bars.
+        let presentation = exact().presentation((1000, 600));
+        assert!(!presentation.contains_cursor((5.0, 300.0)), "left bar");
+        assert!(!presentation.contains_cursor((995.0, 300.0)), "right bar");
+        assert!(!presentation.contains_cursor((500.0, 5.0)), "top bar");
+        assert!(presentation.contains_cursor((500.0, 300.0)), "centre");
+    }
+
+    #[test]
+    fn the_mapping_agrees_with_the_presenter_at_every_window_size() {
+        // The bug this guards: a presenter that rounds the letterbox offset one
+        // way and a cursor mapper that rounds it another. The two are only
+        // guaranteed to agree because they share `presentation`.
+        let config = exact();
+        for window in [
+            (960, 540),
+            (1000, 600),
+            (1280, 720),
+            (500, 400),
+            (321, 181),
+            (4000, 3000),
+        ] {
+            let presentation = config.presentation(window);
+            let (drawn_w, drawn_h) = presentation.drawn_size();
+            assert!(
+                drawn_w <= window.0 && drawn_h <= window.1,
+                "the image must fit {window:?}"
+            );
+            // The centre of the window is the centre of the framebuffer.
+            let centre =
+                presentation.cursor_to_framebuffer((window.0 as f32 / 2.0, window.1 as f32 / 2.0));
+            let expect = (
+                presentation.source.0 as f32 / 2.0,
+                presentation.source.1 as f32 / 2.0,
+            );
+            assert!(
+                (centre.0 - expect.0).abs() <= presentation.scale as f32
+                    && (centre.1 - expect.1).abs() <= presentation.scale as f32,
+                "centre maps to {centre:?}, expected about {expect:?} at {window:?}"
+            );
+            // Every drawn pixel maps back inside the framebuffer.
+            let corner = presentation.cursor_to_framebuffer((
+                (presentation.offset.0 + drawn_w as i32 - 1) as f32,
+                (presentation.offset.1 + drawn_h as i32 - 1) as f32,
+            ));
+            assert!(
+                corner.0 < presentation.source.0 as f32 && corner.1 < presentation.source.1 as f32
+            );
+        }
+    }
+
+    #[test]
+    fn a_stretched_presentation_maps_the_window_onto_the_framebuffer() {
+        let config = WindowConfig {
+            pixel_perfect: false,
+            ..WindowConfig::default().with_internal(320, 180)
+        };
+        let presentation = config.presentation((640, 360));
+        assert_eq!(presentation.scale, 0);
+        assert_eq!(
+            presentation.cursor_to_framebuffer((320.0, 180.0)),
+            (160.0, 90.0)
+        );
+        assert!(presentation.contains_cursor((639.0, 359.0)));
+    }
+
+    #[test]
+    fn mouse_edges_fire_once_and_levels_survive_a_frame() {
+        let mut input = Input::new();
+        input.press_mouse(0);
+        assert!(input.is_mouse_down(0));
+        assert!(input.was_mouse_pressed(0));
+        input.end_frame();
+        assert!(
+            input.is_mouse_down(0),
+            "a drag depends on the level surviving"
+        );
+        assert!(
+            !input.was_mouse_pressed(0),
+            "a click must not repeat every frame"
+        );
+
+        input.release_mouse(0);
+        assert!(!input.is_mouse_down(0));
+        assert!(input.was_mouse_released(0));
+        input.end_frame();
+        assert!(!input.was_mouse_released(0));
+    }
+
+    #[test]
+    fn an_out_of_range_button_index_is_ignored_rather_than_panicking() {
+        let mut input = Input::new();
+        input.press_mouse(9);
+        assert!(!input.is_mouse_down(9));
+        assert!(!input.was_mouse_pressed(9));
     }
 }
 
