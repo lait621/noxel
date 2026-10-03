@@ -1,0 +1,21 @@
+[package]
+name = "noxel-app"
+description = "Noxel application runtime: plugin registry, schedules, headless runner and window host."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-ecs.workspace = true
+noxel-asset.workspace = true
+noxel-render.workspace = true
+noxel-camera.workspace = true
+noxel-visibility.workspace = true
+noxel-physics.workspace = true
+noxel-world.workspace = true
+noxel-npc.workspace = true
+noxel-debug.workspace = true

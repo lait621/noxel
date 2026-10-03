@@ -1,0 +1,15 @@
+[package]
+name = "noxel-world"
+description = "Noxel world: procedural generation, chunk streaming, roads, buildings and prefabs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-ecs.workspace = true
+noxel-asset.workspace = true
+noxel-physics.workspace = true

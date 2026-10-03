@@ -1,0 +1,15 @@
+[package]
+name = "noxel-visibility"
+description = "Noxel visibility: frustum/occlusion culling, LOD selection and camera occlusion fades."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-ecs.workspace = true
+noxel-render.workspace = true
+noxel-camera.workspace = true

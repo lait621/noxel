@@ -1,0 +1,12 @@
+[package]
+name = "noxel-asset"
+description = "Noxel asset pipeline: text formats, PNG codec, atlases, hot reload."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true

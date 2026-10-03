@@ -1,0 +1,13 @@
+[package]
+name = "noxel-physics"
+description = "Noxel physics: broadphase, narrowphase, rigid bodies, character controller and queries."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-ecs.workspace = true

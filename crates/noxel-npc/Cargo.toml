@@ -1,0 +1,15 @@
+[package]
+name = "noxel-npc"
+description = "Noxel NPC simulation: crowd LOD, flow-field pathfinding, steering and schedules."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-ecs.workspace = true
+noxel-physics.workspace = true
+noxel-world.workspace = true

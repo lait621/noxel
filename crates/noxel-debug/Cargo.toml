@@ -1,0 +1,13 @@
+[package]
+name = "noxel-debug"
+description = "Noxel debug tooling: statistics, overlays and the headless frame dumper."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-render.workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "noxel-gen"
+description = "Asset generation CLI for Noxel: pixel-art textures, atlases, tile sets, prefabs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "noxel-gen"
+path = "src/main.rs"
+
+[dependencies]
+noxel-core.workspace = true
+noxel-asset.workspace = true

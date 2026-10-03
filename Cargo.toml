@@ -1,0 +1,72 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/noxel-core",
+    "crates/noxel-ecs",
+    "crates/noxel-asset",
+    "crates/noxel-render",
+    "crates/noxel-camera",
+    "crates/noxel-visibility",
+    "crates/noxel-physics",
+    "crates/noxel-world",
+    "crates/noxel-npc",
+    "crates/noxel-debug",
+    "crates/noxel-app",
+    "tools/noxel-gen",
+    "examples/town-demo",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/noxel"
+authors = ["Noxel Engine Contributors"]
+description = "A lightweight, modular, dependency-free 3D top-down game engine for pixel-art RPGs."
+keywords = ["gamedev", "engine", "top-down", "pixel-art", "rust"]
+categories = ["game-engines", "rendering"]
+
+[workspace.dependencies]
+# ---- Noxel crates (internal, path based) ---------------------------------
+noxel-core = { path = "crates/noxel-core", version = "0.1.0" }
+noxel-ecs = { path = "crates/noxel-ecs", version = "0.1.0" }
+noxel-asset = { path = "crates/noxel-asset", version = "0.1.0" }
+noxel-render = { path = "crates/noxel-render", version = "0.1.0" }
+noxel-camera = { path = "crates/noxel-camera", version = "0.1.0" }
+noxel-visibility = { path = "crates/noxel-visibility", version = "0.1.0" }
+noxel-physics = { path = "crates/noxel-physics", version = "0.1.0" }
+noxel-world = { path = "crates/noxel-world", version = "0.1.0" }
+noxel-npc = { path = "crates/noxel-npc", version = "0.1.0" }
+noxel-debug = { path = "crates/noxel-debug", version = "0.1.0" }
+noxel-app = { path = "crates/noxel-app", version = "0.1.0" }
+
+# NOTE: Noxel intentionally has ZERO third-party dependencies.
+# See docs/adr/0002-zero-dependency-policy.md for the rationale and for the
+# rules a future contributor must follow before adding one.
+
+# ---- Build profiles -------------------------------------------------------
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "unwind"
+strip = "symbols"
+debug = false
+overflow-checks = false
+# The engine's inner loops are all safe Rust; LTO + 1 CGU is what buys us the
+# last ~15% in the rasterizer/raytracer without `unsafe`.
+
+[profile.bench]
+inherits = "release"
+debug = true
+strip = "none"
+
+# Debug builds stay fast enough to run the demo at interactive rates.
+[profile.dev]
+opt-level = 1
+debug = true
+overflow-checks = true
+
+[profile.dev.package."*"]
+opt-level = 3

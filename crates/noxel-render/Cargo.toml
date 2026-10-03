@@ -1,0 +1,13 @@
+[package]
+name = "noxel-render"
+description = "Noxel renderer: framebuffer, software rasterizer, ray tracer, scene graph."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+noxel-core.workspace = true
+noxel-asset.workspace = true
