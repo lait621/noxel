@@ -226,6 +226,47 @@ impl Scene {
         self.meshes.insert(mesh)
     }
 
+    /// Replaces the geometry behind an existing handle.
+    ///
+    /// The rebuild-in-place form of [`Scene::add_mesh`], and the one a
+    /// procedural world wants: `add_mesh` + `remove_instance` looks like an
+    /// update and is actually a **leak**, because the old mesh is still in the
+    /// arena and only the instance referencing it went away. A game that
+    /// rebuilds one mesh per frame leaks [the mesh](Mesh::memory_bytes) per
+    /// frame — hundreds of kilobytes a second — with the scene statistics
+    /// counting up and nothing else to show for it.
+    ///
+    /// Every instance already pointing at `handle` keeps pointing at it, so the
+    /// caller does not have to respawn anything; their cached bounds are
+    /// refreshed here, because a stale AABB makes the visibility pass cull
+    /// something it should draw.
+    ///
+    /// # Errors
+    ///
+    /// Returns the mesh back when the handle is stale, so a caller can fall back
+    /// to [`Scene::add_mesh`] without losing the work.
+    pub fn replace_mesh(&mut self, handle: MeshHandle, mesh: Mesh) -> Result<(), Mesh> {
+        let Some(slot) = self.meshes.get_mut(handle) else {
+            return Err(mesh);
+        };
+        *slot = mesh;
+        self.touch();
+        self.refresh_instance_bounds_for(handle);
+        Ok(())
+    }
+
+    /// Points every instance whose bounds depend on `handle` at the new geometry.
+    fn refresh_instance_bounds_for(&mut self, handle: MeshHandle) {
+        let Some(bounds) = self.meshes.get(handle).map(|mesh| mesh.bounds) else {
+            return;
+        };
+        for instance in self.instances.values_mut() {
+            if instance.mesh == handle {
+                instance.bounds = bounds.transform(&instance.transform.to_mat4());
+            }
+        }
+    }
+
     /// A mesh by handle.
     #[must_use]
     pub fn mesh(&self, handle: MeshHandle) -> Option<&Mesh> {
@@ -236,6 +277,41 @@ impl Scene {
     #[must_use]
     pub fn mesh_count(&self) -> usize {
         self.meshes.len()
+    }
+
+    /// Bytes of vertex and index data held by every mesh in the scene.
+    ///
+    /// The number to assert on in a test that walks a procedural world, and the
+    /// one a frame's memory growth shows up in first: meshes are by far the
+    /// largest thing a `Scene` owns.
+    #[must_use]
+    pub fn mesh_bytes(&self) -> usize {
+        self.meshes
+            .iter()
+            .map(|(_, mesh)| mesh.memory_bytes())
+            .sum()
+    }
+
+    /// Removes **every** mesh that no instance references, returning how many
+    /// went.
+    ///
+    /// A sledgehammer, and deliberately not automatic. It takes meshes nothing
+    /// has ever spawned onto as well as meshes whose instances have gone, so a
+    /// game that keeps a library of geometry to spawn onto later must not call
+    /// it while that library is unreferenced. What it is for is the case a
+    /// caller knows about: "I replaced the farm's geometry, everything nobody is
+    /// drawing is finished with" — and for a test that wants to assert that a
+    /// scene stops growing. [`Scene::despawn`] and [`Scene::replace_mesh`] are
+    /// the per-thing versions of the same idea.
+    pub fn prune_unused_meshes(&mut self) -> usize {
+        let used: Vec<MeshHandle> = self.instances.values().map(|i| i.mesh).collect();
+        let before = self.meshes.len();
+        self.meshes.retain(|handle, _| used.contains(&handle));
+        let removed = before - self.meshes.len();
+        if removed > 0 {
+            self.touch();
+        }
+        removed
     }
 
     /// Every mesh with its handle.
@@ -342,9 +418,39 @@ impl Scene {
     }
 
     /// Removes an instance, returning it.
+    ///
+    /// The mesh it was holding stays in the scene, which is right for a prefab
+    /// shared by several instances and is a leak for a mesh that was built for
+    /// one. Use [`Scene::despawn`] when the mesh belongs to the instance.
     pub fn remove_instance(&mut self, handle: InstanceHandle) -> Option<Instance> {
         self.touch();
         self.instances.remove(handle)
+    }
+
+    /// Removes an instance **and the mesh it was holding**, if no other instance
+    /// still uses that mesh.
+    ///
+    /// The counterpart to [`Scene::spawn`], and the one a caller wants when it
+    /// built the geometry for this instance: a sprite that changes, a farm whose
+    /// tiles were just edited, a chunk that streamed out. Pairing
+    /// `add_mesh`/`spawn` with `remove_instance` looks like it updates the
+    /// object and quietly keeps every version of its geometry alive forever —
+    /// the scene's mesh count climbs by one per frame and the process grows by
+    /// megabytes a second, with no error anywhere to point at.
+    ///
+    /// A mesh that another instance still references is left alone, so a shared
+    /// prefab is never pulled out from under the instances using it.
+    pub fn despawn(&mut self, handle: InstanceHandle) -> Option<Instance> {
+        let instance = self.instances.remove(handle)?;
+        self.touch();
+        let shared = self
+            .instances
+            .values()
+            .any(|other| other.mesh == instance.mesh);
+        if !shared {
+            self.remove_mesh(instance.mesh);
+        }
+        Some(instance)
     }
 
     /// An instance by handle.
@@ -621,6 +727,7 @@ pub fn box_instance(
 mod tests {
     use super::*;
     use crate::material::Material;
+    use noxel_core::math::Vec2;
 
     fn setup() -> (Scene, MeshHandle, MaterialHandle) {
         let mut scene = Scene::new();
@@ -833,5 +940,145 @@ mod tests {
         scene.remove_instance(h);
         assert!(!scene.set_transform(h, Transform::IDENTITY));
         assert!(!scene.update_bounds(h));
+    }
+
+    // ------------------------------------------------- mesh lifetime
+    //
+    // These four are one story. `remove_instance` keeps the geometry, which is
+    // right for a shared prefab and is a per-frame leak for a mesh built for one
+    // instance; `despawn` and `replace_mesh` are the two ways out, and the
+    // farming game shipped with neither.
+
+    #[test]
+    fn removing_an_instance_keeps_its_mesh() {
+        // Not a bug — a documented property, and the reason the leak below is
+        // invisible to anyone reading `remove_instance`.
+        let (mut scene, mesh, mat) = setup();
+        let h = scene.spawn("a", mesh, mat, Transform::IDENTITY);
+        let bytes = scene.mesh_bytes();
+        assert!(bytes > 0);
+        scene.remove_instance(h);
+        assert_eq!(scene.mesh_count(), 1, "the mesh is still the scene's");
+        assert_eq!(scene.mesh_bytes(), bytes);
+    }
+
+    #[test]
+    fn despawning_an_instance_releases_the_mesh_it_owned() {
+        let (mut scene, mesh, mat) = setup();
+        let h = scene.spawn("a", mesh, mat, Transform::IDENTITY);
+        assert!(scene.despawn(h).is_some());
+        assert_eq!(scene.mesh_count(), 0, "the geometry went with the instance");
+        assert_eq!(scene.mesh_bytes(), 0);
+        assert!(scene.instance(h).is_none());
+        // Despawning a stale handle is a no-op, not a panic.
+        assert!(scene.despawn(h).is_none());
+    }
+
+    #[test]
+    fn despawning_keeps_a_mesh_another_instance_still_uses() {
+        let (mut scene, mesh, mat) = setup();
+        let a = scene.spawn("a", mesh, mat, Transform::IDENTITY);
+        let b = scene.spawn("b", mesh, mat, Transform::IDENTITY);
+        scene.despawn(a);
+        assert_eq!(scene.mesh_count(), 1, "b is still drawing that mesh");
+        scene.despawn(b);
+        assert_eq!(scene.mesh_count(), 0, "and now nothing is");
+    }
+
+    #[test]
+    fn replacing_a_mesh_keeps_the_handle_and_the_instances() {
+        let (mut scene, mesh, mat) = setup();
+        let h = scene.spawn("farm", mesh, mat, Transform::IDENTITY);
+        let before = scene.instance(h).unwrap().bounds();
+        let bigger = Mesh::quad(Vec2::new(before.size().x * 4.0, before.size().z * 4.0));
+        assert!(scene.replace_mesh(mesh, bigger).is_ok());
+        assert_eq!(scene.mesh_count(), 1, "a replacement is not an addition");
+        assert_eq!(scene.instance(h).unwrap().mesh, mesh);
+        let after = scene.instance(h).unwrap().bounds();
+        assert!(
+            after.size().x > before.size().x,
+            "bounds followed the new geometry: {before:?} -> {after:?}"
+        );
+    }
+
+    #[test]
+    fn replacing_a_stale_handle_hands_the_mesh_back() {
+        let (mut scene, mesh, _mat) = setup();
+        scene.remove_mesh(mesh);
+        let replacement = Mesh::cube(2.0);
+        let returned = scene.replace_mesh(mesh, replacement);
+        assert!(
+            returned.is_err(),
+            "a stale handle must not swallow the work"
+        );
+        assert_eq!(scene.mesh_count(), 0);
+    }
+
+    #[test]
+    fn a_mesh_rebuilt_every_frame_does_not_grow_the_scene() {
+        // The regression this whole API exists for. A procedural world rebuilds
+        // its ground geometry whenever the world changes; done through
+        // `add_mesh` + `remove_instance` that is one leaked mesh per frame, and
+        // a farm that edits a tile is enough to trigger it.
+        let (mut scene, mesh, mat) = setup();
+        let instance = scene.spawn("ground", mesh, mat, Transform::IDENTITY);
+
+        let leaked = {
+            // The shape of the bug, in five lines, so the fix below is obviously
+            // the same loop with one call changed.
+            let mut leaky = Scene::new();
+            let first = leaky.add_mesh(Mesh::quad(Vec2::new(4.0, 4.0)));
+            let mat = leaky.add_material(Material::unlit("g", Color::WHITE));
+            let mut held = leaky.spawn("g", first, mat, Transform::IDENTITY);
+            for _ in 0..100 {
+                let next = leaky.add_mesh(Mesh::quad(Vec2::new(4.0, 4.0)));
+                let spawned = leaky.spawn("g", next, mat, Transform::IDENTITY);
+                leaky.remove_instance(held);
+                held = spawned;
+            }
+            leaky.mesh_count()
+        };
+        assert_eq!(
+            leaked, 101,
+            "100 rebuilds through add_mesh + remove_instance keep 101 meshes"
+        );
+
+        let mut handle = scene.instance(instance).unwrap().mesh;
+        for _ in 0..100 {
+            let next = Mesh::quad(Vec2::new(4.0, 4.0));
+            if scene.replace_mesh(handle, next).is_err() {
+                handle = scene.add_mesh(Mesh::quad(Vec2::new(4.0, 4.0)));
+                scene.spawn("ground", handle, mat, Transform::IDENTITY);
+            }
+        }
+        assert_eq!(scene.mesh_count(), 1, "in-place rebuilding adds nothing");
+        assert_eq!(
+            scene.mesh_bytes(),
+            Mesh::quad(Vec2::new(4.0, 4.0)).memory_bytes()
+        );
+    }
+
+    #[test]
+    fn pruning_removes_exactly_the_meshes_nothing_draws() {
+        let (mut scene, mesh, mat) = setup();
+        let kept = scene.add_mesh(Mesh::cube(2.0));
+        let dropped = scene.add_mesh(Mesh::cube(3.0));
+        let h = scene.spawn("kept", kept, mat, Transform::IDENTITY);
+        let orphan = scene.spawn("orphan", dropped, mat, Transform::IDENTITY);
+        scene.remove_instance(orphan);
+        assert_eq!(scene.mesh_count(), 3);
+        // Two go: the orphaned cube, and the one `setup` added and no instance
+        // ever referenced. Pruning is a claim about every mesh in the scene,
+        // which is exactly why it is an explicit call and not something the
+        // frame loop does — a game keeping a library of meshes to spawn onto
+        // later must not call it while that library is unreferenced.
+        assert_eq!(scene.prune_unused_meshes(), 2);
+        assert_eq!(scene.mesh_count(), 1);
+        assert!(scene.mesh(mesh).is_none());
+        assert!(scene.mesh(kept).is_some());
+        assert!(scene.mesh(dropped).is_none());
+        assert_eq!(scene.instance(h).unwrap().mesh, kept);
+        // Nothing left to prune.
+        assert_eq!(scene.prune_unused_meshes(), 0);
     }
 }

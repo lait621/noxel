@@ -538,6 +538,20 @@ impl App {
             .debug
             .record_counter("chunk mem KB", (stats.memory_bytes / 1024) as f32);
 
+        // The scene's geometry, every frame, for the same reason the chunk
+        // counters are here: a mesh is the largest thing a scene owns, and a
+        // game that builds one per frame instead of replacing one grows the
+        // process by megabytes a second while every other number on the overlay
+        // looks healthy. Two counters turn that into a line that climbs in front
+        // of whoever is looking at the screen.
+        let scene = self.context.scene.stats();
+        self.context
+            .debug
+            .record_counter("meshes", scene.meshes as f32);
+        self.context
+            .debug
+            .record_counter("mesh mem KB", (scene.memory_bytes / 1024) as f32);
+
         let input = VisibilityInput::new(&self.context.scene, &self.context.view, frame_dt, focus);
         self.context.visible = self.context.visibility.update(&input, &self.config.render);
         let counts = self.context.visible.counts;
