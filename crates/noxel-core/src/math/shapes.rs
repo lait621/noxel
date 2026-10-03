@@ -25,13 +25,19 @@ pub struct Aabb {
 impl Aabb {
     /// An empty box that [`Aabb::grow`] can expand. The min corner starts at
     /// `+INF` and the max at `-INF`, so the first grown point defines the box.
-    pub const EMPTY: Self = Self { min: Vec3::INFINITY, max: Vec3::NEG_INFINITY };
+    pub const EMPTY: Self = Self {
+        min: Vec3::INFINITY,
+        max: Vec3::NEG_INFINITY,
+    };
 
     /// Constructs a box from explicit corners, ordering them if necessary.
     #[inline]
     #[must_use]
     pub fn new(a: Vec3, b: Vec3) -> Self {
-        Self { min: a.min(b), max: a.max(b) }
+        Self {
+            min: a.min(b),
+            max: a.max(b),
+        }
     }
 
     /// Constructs a box from a centre and half-extents.
@@ -39,7 +45,10 @@ impl Aabb {
     #[must_use]
     pub fn from_center_half_extents(center: Vec3, half: Vec3) -> Self {
         let half = half.abs();
-        Self { min: center - half, max: center + half }
+        Self {
+            min: center - half,
+            max: center + half,
+        }
     }
 
     /// Constructs a cube from a centre and an edge length.
@@ -47,7 +56,10 @@ impl Aabb {
     #[must_use]
     pub fn from_center_size(center: Vec3, size: f32) -> Self {
         let h = size * 0.5;
-        Self { min: center - Vec3::splat(h), max: center + Vec3::splat(h) }
+        Self {
+            min: center - Vec3::splat(h),
+            max: center + Vec3::splat(h),
+        }
     }
 
     /// Wraps a slice of points (returns [`Aabb::EMPTY`] when empty).
@@ -92,7 +104,10 @@ impl Aabb {
     #[inline]
     #[must_use]
     pub fn union(&self, other: &Aabb) -> Self {
-        Self { min: self.min.min(other.min), max: self.max.max(other.max) }
+        Self {
+            min: self.min.min(other.min),
+            max: self.max.max(other.max),
+        }
     }
 
     /// The overlap of both boxes, or `None` when they are disjoint.
@@ -101,7 +116,11 @@ impl Aabb {
     pub fn intersection(&self, other: &Aabb) -> Option<Self> {
         let min = self.min.max(other.min);
         let max = self.max.min(other.max);
-        if min.x <= max.x && min.y <= max.y && min.z <= max.z { Some(Self { min, max }) } else { None }
+        if min.x <= max.x && min.y <= max.y && min.z <= max.z {
+            Some(Self { min, max })
+        } else {
+            None
+        }
     }
 
     /// Expands every side by `amount` (which may be negative to shrink).
@@ -109,7 +128,10 @@ impl Aabb {
     #[must_use]
     pub fn expanded(&self, amount: f32) -> Self {
         let a = Vec3::splat(amount);
-        Self { min: self.min - a, max: self.max + a }
+        Self {
+            min: self.min - a,
+            max: self.max + a,
+        }
     }
 
     /// Expands every side in place.
@@ -122,14 +144,20 @@ impl Aabb {
     #[inline]
     #[must_use]
     pub fn translated(&self, t: Vec3) -> Self {
-        Self { min: self.min + t, max: self.max + t }
+        Self {
+            min: self.min + t,
+            max: self.max + t,
+        }
     }
 
     /// A box that also covers `y = y` for every XZ point of `self`.
     #[inline]
     #[must_use]
     pub fn with_y_range(&self, y_min: f32, y_max: f32) -> Self {
-        Self { min: Vec3::new(self.min.x, y_min, self.min.z), max: Vec3::new(self.max.x, y_max, self.max.z) }
+        Self {
+            min: Vec3::new(self.min.x, y_min, self.min.z),
+            max: Vec3::new(self.max.x, y_max, self.max.z),
+        }
     }
 
     /// Centre point.
@@ -158,7 +186,11 @@ impl Aabb {
     #[must_use]
     pub fn volume(&self) -> f32 {
         let s = self.size();
-        if s.x <= 0.0 || s.y <= 0.0 || s.z <= 0.0 { 0.0 } else { s.x * s.y * s.z }
+        if s.x <= 0.0 || s.y <= 0.0 || s.z <= 0.0 {
+            0.0
+        } else {
+            s.x * s.y * s.z
+        }
     }
 
     /// Surface area, the standard cost estimate for a BVH node.
@@ -182,7 +214,13 @@ impl Aabb {
     #[must_use]
     pub fn longest_axis(&self) -> usize {
         let s = self.size();
-        if s.x >= s.y && s.x >= s.z { 0 } else if s.y >= s.z { 1 } else { 2 }
+        if s.x >= s.y && s.x >= s.z {
+            0
+        } else if s.y >= s.z {
+            1
+        } else {
+            2
+        }
     }
 
     /// True when the box has no extent, or was never grown.
@@ -310,18 +348,18 @@ impl Aabb {
     #[inline]
     #[must_use]
     pub fn intersect_ray(&self, origin: Vec3, dir: Vec3) -> Option<(f32, f32)> {
-        let inv = Vec3::new(
-            safe_inv(dir.x),
-            safe_inv(dir.y),
-            safe_inv(dir.z),
-        );
+        let inv = Vec3::new(safe_inv(dir.x), safe_inv(dir.y), safe_inv(dir.z));
         let t0 = (self.min - origin) * inv;
         let t1 = (self.max - origin) * inv;
         let tmin = t0.min(t1);
         let tmax = t0.max(t1);
         let t_enter = tmin.x.max(tmin.y).max(tmin.z).max(0.0);
         let t_exit = tmax.x.min(tmax.y).min(tmax.z);
-        if t_enter <= t_exit { Some((t_enter, t_exit)) } else { None }
+        if t_enter <= t_exit {
+            Some((t_enter, t_exit))
+        } else {
+            None
+        }
     }
 
     /// Convenience ray test that ignores the hit distances.
@@ -363,7 +401,11 @@ impl Default for Aabb {
 /// so `0.0 * inf = NaN` never poisons the slab test.
 #[inline]
 fn safe_inv(v: f32) -> f32 {
-    if v.abs() < 1e-20 { 1e20_f32.copysign(v) } else { 1.0 / v }
+    if v.abs() < 1e-20 {
+        1e20_f32.copysign(v)
+    } else {
+        1.0 / v
+    }
 }
 
 /// A sphere.
@@ -453,21 +495,32 @@ pub struct Ray {
 
 impl Ray {
     /// An infinite ray starting at the origin.
-    pub const INFINITE: Self =
-        Self { origin: Vec3::ZERO, dir: Vec3::new(0.0, 0.0, -1.0), max_t: f32::INFINITY };
+    pub const INFINITE: Self = Self {
+        origin: Vec3::ZERO,
+        dir: Vec3::new(0.0, 0.0, -1.0),
+        max_t: f32::INFINITY,
+    };
 
     /// Constructs a ray of unlimited length, normalising `dir`.
     #[inline]
     #[must_use]
     pub fn new(origin: Vec3, dir: Vec3) -> Self {
-        Self { origin, dir: dir.normalize_or_zero(), max_t: f32::INFINITY }
+        Self {
+            origin,
+            dir: dir.normalize_or_zero(),
+            max_t: f32::INFINITY,
+        }
     }
 
     /// Constructs a ray with a distance limit.
     #[inline]
     #[must_use]
     pub fn with_max_t(origin: Vec3, dir: Vec3, max_t: f32) -> Self {
-        Self { origin, dir: dir.normalize_or_zero(), max_t }
+        Self {
+            origin,
+            dir: dir.normalize_or_zero(),
+            max_t,
+        }
     }
 
     /// The point at distance `t`.
@@ -482,7 +535,10 @@ impl Ray {
     #[inline]
     #[must_use]
     pub fn offset(&self, amount: f32) -> Self {
-        Self { origin: self.origin + self.dir * amount, ..*self }
+        Self {
+            origin: self.origin + self.dir * amount,
+            ..*self
+        }
     }
 
     /// Box intersection within `max_t`.
@@ -490,7 +546,11 @@ impl Ray {
     #[must_use]
     pub fn intersect_aabb(&self, b: &Aabb) -> Option<f32> {
         let (t0, t1) = b.intersect_ray(self.origin, self.dir)?;
-        if t0 > self.max_t || t1 < 0.0 { None } else { Some(t0.max(0.0)) }
+        if t0 > self.max_t || t1 < 0.0 {
+            None
+        } else {
+            Some(t0.max(0.0))
+        }
     }
 
     /// Sphere intersection within `max_t`.
@@ -498,7 +558,11 @@ impl Ray {
     #[must_use]
     pub fn intersect_sphere(&self, s: &Sphere) -> Option<f32> {
         let (t0, t1) = s.intersect_ray(self.origin, self.dir)?;
-        if t0 > self.max_t || t1 < 0.0 { None } else { Some(t0.max(0.0)) }
+        if t0 > self.max_t || t1 < 0.0 {
+            None
+        } else {
+            Some(t0.max(0.0))
+        }
     }
 
     /// Plane intersection within `max_t`.
@@ -510,7 +574,11 @@ impl Ray {
             return None;
         }
         let t = (p.d - p.normal.dot(self.origin)) / denom;
-        if (0.0..=self.max_t).contains(&t) { Some(t) } else { None }
+        if (0.0..=self.max_t).contains(&t) {
+            Some(t)
+        } else {
+            None
+        }
     }
 
     /// Möller–Trumbore triangle intersection within `max_t`.
@@ -541,7 +609,11 @@ impl Ray {
             return None;
         }
         let t = e2.dot(qvec) * inv_det;
-        if t < RAY_EPSILON || t > self.max_t { None } else { Some((t, u, v)) }
+        if t < RAY_EPSILON || t > self.max_t {
+            None
+        } else {
+            Some((t, u, v))
+        }
     }
 }
 
@@ -566,7 +638,10 @@ impl Plane {
     #[inline]
     #[must_use]
     pub fn new(normal: Vec3, d: f32) -> Self {
-        Self { normal: normal.normalize_or_zero(), d }
+        Self {
+            normal: normal.normalize_or_zero(),
+            d,
+        }
     }
 
     /// Constructs a plane through three points (counter-clockwise winding).
@@ -574,7 +649,10 @@ impl Plane {
     #[must_use]
     pub fn from_points(a: Vec3, b: Vec3, c: Vec3) -> Self {
         let n = (b - a).cross(c - a).normalize_or_zero();
-        Self { normal: n, d: n.dot(a) }
+        Self {
+            normal: n,
+            d: n.dot(a),
+        }
     }
 
     /// Constructs a plane with the given normal that passes through `p`.
@@ -582,7 +660,10 @@ impl Plane {
     #[must_use]
     pub fn from_point_normal(p: Vec3, normal: Vec3) -> Self {
         let n = normal.normalize_or_zero();
-        Self { normal: n, d: n.dot(p) }
+        Self {
+            normal: n,
+            d: n.dot(p),
+        }
     }
 
     /// Signed distance from `p`; positive on the normal's side.
@@ -635,12 +716,30 @@ impl Frustum {
     /// Everything; a frustum that contains the whole world.
     pub const INFINITE: Self = Self {
         planes: [
-            Plane { normal: Vec3::new(1.0, 0.0, 0.0), d: f32::INFINITY },
-            Plane { normal: Vec3::new(-1.0, 0.0, 0.0), d: f32::INFINITY },
-            Plane { normal: Vec3::new(0.0, 1.0, 0.0), d: f32::INFINITY },
-            Plane { normal: Vec3::new(0.0, -1.0, 0.0), d: f32::INFINITY },
-            Plane { normal: Vec3::new(0.0, 0.0, 1.0), d: f32::INFINITY },
-            Plane { normal: Vec3::new(0.0, 0.0, -1.0), d: f32::INFINITY },
+            Plane {
+                normal: Vec3::new(1.0, 0.0, 0.0),
+                d: f32::INFINITY,
+            },
+            Plane {
+                normal: Vec3::new(-1.0, 0.0, 0.0),
+                d: f32::INFINITY,
+            },
+            Plane {
+                normal: Vec3::new(0.0, 1.0, 0.0),
+                d: f32::INFINITY,
+            },
+            Plane {
+                normal: Vec3::new(0.0, -1.0, 0.0),
+                d: f32::INFINITY,
+            },
+            Plane {
+                normal: Vec3::new(0.0, 0.0, 1.0),
+                d: f32::INFINITY,
+            },
+            Plane {
+                normal: Vec3::new(0.0, 0.0, -1.0),
+                d: f32::INFINITY,
+            },
         ],
     };
 
@@ -659,9 +758,15 @@ impl Frustum {
             // Clip-space inside-test is `n·p + w >= 0`, i.e. `n·p >= -w`.
             // `Plane::distance_to_point` is `normal·p - d`, so `d = -w / |n|`.
             if len < 1e-12 {
-                Plane { normal: Vec3::ZERO, d: f32::NEG_INFINITY }
+                Plane {
+                    normal: Vec3::ZERO,
+                    d: f32::NEG_INFINITY,
+                }
             } else {
-                Plane { normal: n / len, d: -v.w / len }
+                Plane {
+                    normal: n / len,
+                    d: -v.w / len,
+                }
             }
         };
         Self {
@@ -680,7 +785,9 @@ impl Frustum {
     #[inline]
     #[must_use]
     pub fn contains_point(&self, p: Vec3) -> bool {
-        self.planes.iter().all(|pl| pl.distance_to_point(p) >= -RAY_EPSILON)
+        self.planes
+            .iter()
+            .all(|pl| pl.distance_to_point(p) >= -RAY_EPSILON)
     }
 
     /// Conservative AABB test.
@@ -709,7 +816,9 @@ impl Frustum {
     #[inline]
     #[must_use]
     pub fn intersects_sphere(&self, center: Vec3, radius: f32) -> bool {
-        self.planes.iter().all(|pl| pl.distance_to_point(center) >= -radius)
+        self.planes
+            .iter()
+            .all(|pl| pl.distance_to_point(center) >= -radius)
     }
 
     /// True when `b` is entirely inside (used to promote a node to "always
@@ -739,20 +848,29 @@ pub struct Rect {
 
 impl Rect {
     /// An empty rectangle.
-    pub const EMPTY: Self = Self { min: Vec2::new(f32::INFINITY, f32::INFINITY), max: Vec2::new(f32::NEG_INFINITY, f32::NEG_INFINITY) };
+    pub const EMPTY: Self = Self {
+        min: Vec2::new(f32::INFINITY, f32::INFINITY),
+        max: Vec2::new(f32::NEG_INFINITY, f32::NEG_INFINITY),
+    };
 
     /// Constructs a rectangle from two corners, ordering them.
     #[inline]
     #[must_use]
     pub fn new(a: Vec2, b: Vec2) -> Self {
-        Self { min: a.min(b), max: a.max(b) }
+        Self {
+            min: a.min(b),
+            max: a.max(b),
+        }
     }
 
     /// Constructs a rectangle from a position and a size.
     #[inline]
     #[must_use]
     pub fn from_pos_size(pos: Vec2, size: Vec2) -> Self {
-        Self { min: pos, max: pos + size }
+        Self {
+            min: pos,
+            max: pos + size,
+        }
     }
 
     /// Constructs a rectangle from explicit edges.
@@ -801,7 +919,11 @@ impl Rect {
     #[inline]
     #[must_use]
     pub fn area(&self) -> f32 {
-        if self.is_empty() { 0.0 } else { self.width() * self.height() }
+        if self.is_empty() {
+            0.0
+        } else {
+            self.width() * self.height()
+        }
     }
 
     /// True when `p` is inside.
@@ -815,7 +937,10 @@ impl Rect {
     #[inline]
     #[must_use]
     pub fn intersects(&self, other: &Rect) -> bool {
-        self.min.x <= other.max.x && self.max.x >= other.min.x && self.min.y <= other.max.y && self.max.y >= other.min.y
+        self.min.x <= other.max.x
+            && self.max.x >= other.min.x
+            && self.min.y <= other.max.y
+            && self.max.y >= other.min.y
     }
 
     /// Overlap region, or `None`.
@@ -824,14 +949,21 @@ impl Rect {
     pub fn intersection(&self, other: &Rect) -> Option<Rect> {
         let min = self.min.max(other.min);
         let max = self.max.min(other.max);
-        if min.x <= max.x && min.y <= max.y { Some(Rect { min, max }) } else { None }
+        if min.x <= max.x && min.y <= max.y {
+            Some(Rect { min, max })
+        } else {
+            None
+        }
     }
 
     /// Smallest rectangle containing both.
     #[inline]
     #[must_use]
     pub fn union(&self, other: &Rect) -> Rect {
-        Rect { min: self.min.min(other.min), max: self.max.max(other.max) }
+        Rect {
+            min: self.min.min(other.min),
+            max: self.max.max(other.max),
+        }
     }
 
     /// Grows the rectangle to include `p`.
@@ -845,7 +977,10 @@ impl Rect {
     #[inline]
     #[must_use]
     pub fn expanded(&self, amount: Vec2) -> Rect {
-        Rect { min: self.min - amount, max: self.max + amount }
+        Rect {
+            min: self.min - amount,
+            max: self.max + amount,
+        }
     }
 
     /// The integer pixel rectangle fully containing this one.
@@ -855,7 +990,12 @@ impl Rect {
     #[inline]
     #[must_use]
     pub fn to_pixel_bounds(&self) -> (i32, i32, i32, i32) {
-        (self.min.x.floor() as i32, self.min.y.floor() as i32, self.max.x.ceil() as i32, self.max.y.ceil() as i32)
+        (
+            self.min.x.floor() as i32,
+            self.min.y.floor() as i32,
+            self.max.x.ceil() as i32,
+            self.max.y.ceil() as i32,
+        )
     }
 
     /// Normalised UV coordinates of `p` inside this rectangle.
@@ -864,8 +1004,16 @@ impl Rect {
     pub fn uv(&self, p: Vec2) -> Vec2 {
         let s = self.size();
         Vec2::new(
-            if s.x.abs() < EPSILON { 0.0 } else { (p.x - self.min.x) / s.x },
-            if s.y.abs() < EPSILON { 0.0 } else { (p.y - self.min.y) / s.y },
+            if s.x.abs() < EPSILON {
+                0.0
+            } else {
+                (p.x - self.min.x) / s.x
+            },
+            if s.y.abs() < EPSILON {
+                0.0
+            } else {
+                (p.y - self.min.y) / s.y
+            },
         )
     }
 }
@@ -885,41 +1033,62 @@ pub struct Transform {
 
 impl Transform {
     /// Position at the origin, no rotation, unit scale.
-    pub const IDENTITY: Self = Self { translation: Vec3::ZERO, rotation: Quat::IDENTITY, scale: Vec3::ONE };
+    pub const IDENTITY: Self = Self {
+        translation: Vec3::ZERO,
+        rotation: Quat::IDENTITY,
+        scale: Vec3::ONE,
+    };
 
     /// Constructs a transform.
     #[inline]
     #[must_use]
     pub const fn new(translation: Vec3, rotation: Quat, scale: Vec3) -> Self {
-        Self { translation, rotation, scale }
+        Self {
+            translation,
+            rotation,
+            scale,
+        }
     }
 
     /// Translation only.
     #[inline]
     #[must_use]
     pub const fn from_translation(t: Vec3) -> Self {
-        Self { translation: t, ..Self::IDENTITY }
+        Self {
+            translation: t,
+            ..Self::IDENTITY
+        }
     }
 
     /// Rotation only.
     #[inline]
     #[must_use]
     pub const fn from_rotation(r: Quat) -> Self {
-        Self { rotation: r, ..Self::IDENTITY }
+        Self {
+            rotation: r,
+            ..Self::IDENTITY
+        }
     }
 
     /// Uniform scale only.
     #[inline]
     #[must_use]
     pub const fn from_scale(s: f32) -> Self {
-        Self { scale: Vec3::splat(s), ..Self::IDENTITY }
+        Self {
+            scale: Vec3::splat(s),
+            ..Self::IDENTITY
+        }
     }
 
     /// Position and yaw, the common case for top-down entities.
     #[inline]
     #[must_use]
     pub fn from_yaw(t: Vec3, yaw: f32) -> Self {
-        Self { translation: t, rotation: Quat::from_rotation_y(yaw), scale: Vec3::ONE }
+        Self {
+            translation: t,
+            rotation: Quat::from_rotation_y(yaw),
+            scale: Vec3::ONE,
+        }
     }
 
     /// The equivalent 4×4 matrix.
@@ -939,7 +1108,11 @@ impl Transform {
         }
         let inv_rot = self.rotation.inverse()?;
         let inv_t = inv_rot.rotate_vec3(-self.translation * inv_scale);
-        Some(Self { translation: inv_t, rotation: inv_rot, scale: inv_scale })
+        Some(Self {
+            translation: inv_t,
+            rotation: inv_rot,
+            scale: inv_scale,
+        })
     }
 
     /// Transforms a point through this transform.
@@ -1065,8 +1238,14 @@ mod tests {
     #[test]
     fn sphere_ray() {
         let s = Sphere::new(Vec3::ZERO, 2.0);
-        assert!(s.intersect_ray(Vec3::new(-5.0, 0.0, 0.0), Vec3::X).is_some());
-        assert!(s.intersect_ray(Vec3::new(-5.0, 3.0, 0.0), Vec3::X).is_none());
+        assert!(
+            s.intersect_ray(Vec3::new(-5.0, 0.0, 0.0), Vec3::X)
+                .is_some()
+        );
+        assert!(
+            s.intersect_ray(Vec3::new(-5.0, 3.0, 0.0), Vec3::X)
+                .is_none()
+        );
     }
 
     #[test]
@@ -1082,7 +1261,10 @@ mod tests {
     #[test]
     fn ray_triangle_backface_miss_above_plane() {
         let ray = Ray::new(Vec3::new(2.0, 2.0, 1.0), Vec3::new(0.0, 0.0, -1.0));
-        assert!(ray.intersect_triangle(Vec3::ZERO, Vec3::X, Vec3::Y).is_none());
+        assert!(
+            ray.intersect_triangle(Vec3::ZERO, Vec3::X, Vec3::Y)
+                .is_none()
+        );
     }
 
     #[test]
@@ -1092,13 +1274,19 @@ mod tests {
         let f = Frustum::from_view_projection(&(proj * view));
 
         let inside = Aabb::new(Vec3::splat(-1.0), Vec3::splat(1.0));
-        assert!(f.intersects_aabb(&inside), "origin should be visible from above");
+        assert!(
+            f.intersects_aabb(&inside),
+            "origin should be visible from above"
+        );
 
         let far_away = Aabb::new(Vec3::splat(500.0), Vec3::splat(501.0));
         assert!(!f.intersects_aabb(&far_away), "far box should be culled");
 
         let behind_camera = Aabb::new(Vec3::new(-1.0, 200.0, -1.0), Vec3::new(1.0, 201.0, 1.0));
-        assert!(!f.intersects_aabb(&behind_camera), "box above the camera should be culled");
+        assert!(
+            !f.intersects_aabb(&behind_camera),
+            "box above the camera should be culled"
+        );
     }
 
     #[test]

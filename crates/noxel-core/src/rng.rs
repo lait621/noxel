@@ -117,7 +117,10 @@ impl Pcg32 {
     /// independent sequences.
     #[must_use]
     pub fn from_seed_stream(seed: u64, stream: u64) -> Self {
-        let mut g = Self { state: 0, inc: (stream << 1) | 1 };
+        let mut g = Self {
+            state: 0,
+            inc: (stream << 1) | 1,
+        };
         g.next_u32();
         g.state = g.state.wrapping_add(seed);
         g.next_u32();
@@ -128,7 +131,9 @@ impl Pcg32 {
     #[inline]
     pub fn next_u32(&mut self) -> u32 {
         let old = self.state;
-        self.state = old.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(self.inc);
+        self.state = old
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(self.inc);
         let xorshifted = (((old >> 18) ^ old) >> 27) as u32;
         let rot = (old >> 59) as u32;
         xorshifted.rotate_right(rot)
@@ -197,7 +202,11 @@ impl Pcg32 {
     /// Picks a random element, or `None` for an empty slice.
     #[inline]
     pub fn pick<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
-        if items.is_empty() { None } else { Some(&items[self.range_usize(0, items.len())]) }
+        if items.is_empty() {
+            None
+        } else {
+            Some(&items[self.range_usize(0, items.len())])
+        }
     }
 
     /// Picks an index weighted by `weights`.
@@ -338,14 +347,22 @@ impl RngStream {
     #[inline]
     #[must_use]
     pub fn root(seed: u64) -> Self {
-        Self { seed, label: 0, index: 0 }
+        Self {
+            seed,
+            label: 0,
+            index: 0,
+        }
     }
 
     /// A stream addressed by `(seed, label, index)`.
     #[inline]
     #[must_use]
     pub fn indexed(seed: u64, label: &str, index: u64) -> Self {
-        Self { seed, label: hash_str(label), index }
+        Self {
+            seed,
+            label: hash_str(label),
+            index,
+        }
     }
 
     /// A stream addressed by a 2D chunk coordinate.
@@ -439,7 +456,11 @@ impl<T: Clone> ShuffleBag<T> {
     #[must_use]
     pub fn new(items: Vec<T>) -> Self {
         let order = (0..items.len()).collect();
-        Self { items, order, cursor: 0 }
+        Self {
+            items,
+            order,
+            cursor: 0,
+        }
     }
 
     /// Number of items.
@@ -481,7 +502,11 @@ pub const fn is_power_of_two(value: u32) -> bool {
 #[must_use]
 pub fn pick_in_range(r: u32, range: Range<usize>) -> usize {
     let span = range.end.saturating_sub(range.start);
-    if span == 0 { range.start } else { range.start + (r as usize) % span }
+    if span == 0 {
+        range.start
+    } else {
+        range.start + (r as usize) % span
+    }
 }
 
 #[cfg(test)]
@@ -588,9 +613,15 @@ mod tests {
 
     #[test]
     fn stream_is_addressable_and_reproducible() {
-        let a = RngStream::for_chunk(7, "buildings", 12, -3).rng().next_u32();
-        let b = RngStream::for_chunk(7, "buildings", 12, -3).rng().next_u32();
-        let c = RngStream::for_chunk(7, "buildings", 12, -2).rng().next_u32();
+        let a = RngStream::for_chunk(7, "buildings", 12, -3)
+            .rng()
+            .next_u32();
+        let b = RngStream::for_chunk(7, "buildings", 12, -3)
+            .rng()
+            .next_u32();
+        let c = RngStream::for_chunk(7, "buildings", 12, -2)
+            .rng()
+            .next_u32();
         let d = RngStream::for_chunk(7, "roads", 12, -3).rng().next_u32();
         assert_eq!(a, b);
         assert_ne!(a, c);
@@ -646,7 +677,10 @@ mod tests {
             bits += (a ^ b).count_ones();
         }
         let mean = bits as f32 / n as f32;
-        assert!((25.0..=39.0).contains(&mean), "mean hamming distance {mean}");
+        assert!(
+            (25.0..=39.0).contains(&mean),
+            "mean hamming distance {mean}"
+        );
 
         // And the values must all be distinct over a small window.
         let mut seen: Vec<u64> = (0..512).map(|i| hash_2d(i, 7, 1)).collect();

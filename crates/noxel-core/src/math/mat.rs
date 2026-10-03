@@ -45,11 +45,17 @@ impl Default for Mat4 {
 impl Mat3 {
     /// The identity matrix.
     pub const IDENTITY: Self = Self {
-        cols: [Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0), Vec3::new(0.0, 0.0, 1.0)],
+        cols: [
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        ],
     };
 
     /// The zero matrix.
-    pub const ZERO: Self = Self { cols: [Vec3::ZERO; 3] };
+    pub const ZERO: Self = Self {
+        cols: [Vec3::ZERO; 3],
+    };
 
     /// Builds from three column vectors.
     #[inline]
@@ -107,7 +113,11 @@ impl Mat3 {
     #[must_use]
     pub fn from_rotation_x(angle: f32) -> Self {
         let (s, c) = angle.sin_cos();
-        Self::from_cols(Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, c, s), Vec3::new(0.0, -s, c))
+        Self::from_cols(
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, c, s),
+            Vec3::new(0.0, -s, c),
+        )
     }
 
     /// Rotation about the Y axis.
@@ -115,7 +125,11 @@ impl Mat3 {
     #[must_use]
     pub fn from_rotation_y(angle: f32) -> Self {
         let (s, c) = angle.sin_cos();
-        Self::from_cols(Vec3::new(c, 0.0, -s), Vec3::new(0.0, 1.0, 0.0), Vec3::new(s, 0.0, c))
+        Self::from_cols(
+            Vec3::new(c, 0.0, -s),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(s, 0.0, c),
+        )
     }
 
     /// Rotation about the Z axis.
@@ -123,7 +137,11 @@ impl Mat3 {
     #[must_use]
     pub fn from_rotation_z(angle: f32) -> Self {
         let (s, c) = angle.sin_cos();
-        Self::from_cols(Vec3::new(c, s, 0.0), Vec3::new(-s, c, 0.0), Vec3::new(0.0, 0.0, 1.0))
+        Self::from_cols(
+            Vec3::new(c, s, 0.0),
+            Vec3::new(-s, c, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        )
     }
 
     /// Rotation of `angle` radians about an arbitrary axis.
@@ -178,7 +196,11 @@ impl Mat3 {
     #[inline]
     #[must_use]
     pub const fn from_scale(v: Vec3) -> Self {
-        Self::from_cols(Vec3::new(v.x, 0.0, 0.0), Vec3::new(0.0, v.y, 0.0), Vec3::new(0.0, 0.0, v.z))
+        Self::from_cols(
+            Vec3::new(v.x, 0.0, 0.0),
+            Vec3::new(0.0, v.y, 0.0),
+            Vec3::new(0.0, 0.0, v.z),
+        )
     }
 
     /// Extracts the upper-left 3×3 block of a [`Mat4`].
@@ -209,8 +231,7 @@ impl Mat3 {
     #[must_use]
     pub fn determinant(&self) -> f32 {
         let c = &self.cols;
-        c[0].x * (c[1].y * c[2].z - c[1].z * c[2].y)
-            - c[1].x * (c[0].y * c[2].z - c[0].z * c[2].y)
+        c[0].x * (c[1].y * c[2].z - c[1].z * c[2].y) - c[1].x * (c[0].y * c[2].z - c[0].z * c[2].y)
             + c[2].x * (c[0].y * c[1].z - c[0].z * c[1].y)
     }
 
@@ -297,7 +318,9 @@ impl Mat4 {
     };
 
     /// The zero matrix.
-    pub const ZERO: Self = Self { cols: [Vec4::ZERO; 4] };
+    pub const ZERO: Self = Self {
+        cols: [Vec4::ZERO; 4],
+    };
 
     /// Builds from four column vectors.
     #[inline]
@@ -455,10 +478,16 @@ impl Mat4 {
     #[inline]
     #[must_use]
     pub fn look_at_rh(eye: Vec3, target: Vec3, up: Vec3) -> Self {
-        let f = (target - eye).try_normalize().unwrap_or(Vec3::new(0.0, 0.0, -1.0));
+        let f = (target - eye)
+            .try_normalize()
+            .unwrap_or(Vec3::new(0.0, 0.0, -1.0));
         // Degenerate up hint (camera looking straight down) -> pick a safe axis
         // so a perfectly top-down camera does not produce a NaN matrix.
-        let up = if f.cross(up).length_squared() < EPSILON * EPSILON { Vec3::Z } else { up };
+        let up = if f.cross(up).length_squared() < EPSILON * EPSILON {
+            Vec3::Z
+        } else {
+            up
+        };
         let s = f.cross(up).normalize_or_zero();
         let u = s.cross(f);
         Self::from_cols(
@@ -522,10 +551,30 @@ impl Mat4 {
     #[must_use]
     pub fn transpose(&self) -> Self {
         Self::from_cols(
-            Vec4::new(self.get(0, 0), self.get(0, 1), self.get(0, 2), self.get(0, 3)),
-            Vec4::new(self.get(1, 0), self.get(1, 1), self.get(1, 2), self.get(1, 3)),
-            Vec4::new(self.get(2, 0), self.get(2, 1), self.get(2, 2), self.get(2, 3)),
-            Vec4::new(self.get(3, 0), self.get(3, 1), self.get(3, 2), self.get(3, 3)),
+            Vec4::new(
+                self.get(0, 0),
+                self.get(0, 1),
+                self.get(0, 2),
+                self.get(0, 3),
+            ),
+            Vec4::new(
+                self.get(1, 0),
+                self.get(1, 1),
+                self.get(1, 2),
+                self.get(1, 3),
+            ),
+            Vec4::new(
+                self.get(2, 0),
+                self.get(2, 1),
+                self.get(2, 2),
+                self.get(2, 3),
+            ),
+            Vec4::new(
+                self.get(3, 0),
+                self.get(3, 1),
+                self.get(3, 2),
+                self.get(3, 3),
+            ),
         )
     }
 
@@ -754,7 +803,11 @@ mod tests {
     #[test]
     fn perfectly_top_down_look_at_is_finite() {
         // up == view direction would be degenerate for a naive implementation.
-        let view = Mat4::look_at_rh(Vec3::new(0.0, 10.0, 0.0), Vec3::ZERO, Vec3::new(0.0, 1.0, 0.0));
+        let view = Mat4::look_at_rh(
+            Vec3::new(0.0, 10.0, 0.0),
+            Vec3::ZERO,
+            Vec3::new(0.0, 1.0, 0.0),
+        );
         assert!(view.is_finite(), "{view:?}");
     }
 
@@ -781,7 +834,10 @@ mod tests {
         let mut m = Mat4::IDENTITY;
         m.cols[0].y = 3.0; // row 1, column 0
         let t = m.transpose();
-        assert!(approx(t.get(0, 1), 3.0), "element must move to row 0, column 1");
+        assert!(
+            approx(t.get(0, 1), 3.0),
+            "element must move to row 0, column 1"
+        );
         assert!(approx(t.get(1, 0), 0.0));
     }
 

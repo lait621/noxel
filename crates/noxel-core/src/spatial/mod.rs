@@ -38,7 +38,12 @@ impl RayHit {
     #[inline]
     #[must_use]
     pub fn new(t: f32, point: Vec3, normal: Vec3) -> Self {
-        Self { t, point, normal, back_face: false }
+        Self {
+            t,
+            point,
+            normal,
+            back_face: false,
+        }
     }
 
     /// Marks the hit as a back face.

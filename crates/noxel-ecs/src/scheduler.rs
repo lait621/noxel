@@ -66,7 +66,11 @@ impl<C> SystemEntry<C> {
     /// Average cost per run in milliseconds.
     #[must_use]
     pub fn mean_ms(&self) -> f32 {
-        if self.runs == 0 { 0.0 } else { (self.total_ms / self.runs as f64) as f32 }
+        if self.runs == 0 {
+            0.0
+        } else {
+            (self.total_ms / self.runs as f64) as f32
+        }
     }
 }
 
@@ -106,7 +110,11 @@ impl<C> Stage<C> {
     /// Sum of the systems' last-run times, in milliseconds.
     #[must_use]
     pub fn last_ms(&self) -> f32 {
-        self.systems.iter().filter(|s| s.enabled).map(|s| s.last_ms).sum()
+        self.systems
+            .iter()
+            .filter(|s| s.enabled)
+            .map(|s| s.last_ms)
+            .sum()
     }
 }
 
@@ -138,7 +146,10 @@ impl<C> Scheduler<C> {
     /// Creates an empty scheduler.
     #[must_use]
     pub fn new() -> Self {
-        Self { stages: Vec::new(), frames: 0 }
+        Self {
+            stages: Vec::new(),
+            frames: 0,
+        }
     }
 
     /// Adds a stage.
@@ -153,7 +164,10 @@ impl<C> Scheduler<C> {
             !self.stages.iter().any(|s| s.name == name),
             "duplicate scheduler stage `{name}`"
         );
-        self.stages.push(Stage { name, systems: Vec::new() });
+        self.stages.push(Stage {
+            name,
+            systems: Vec::new(),
+        });
         self
     }
 
@@ -204,7 +218,9 @@ impl<C> Scheduler<C> {
 
     /// Runs only the named stage. Useful for editor-style stepping and tests.
     pub fn run_stage(&mut self, stage: &str, ctx: &mut C) {
-        let Some(s) = self.stages.iter_mut().find(|s| s.name == stage) else { return };
+        let Some(s) = self.stages.iter_mut().find(|s| s.name == stage) else {
+            return;
+        };
         for system in &mut s.systems {
             if !system.enabled {
                 continue;
@@ -272,7 +288,10 @@ impl<C> Scheduler<C> {
     /// Looks up a system's entry.
     #[must_use]
     pub fn system(&self, system: &str) -> Option<&SystemEntry<C>> {
-        self.stages.iter().flat_map(|s| s.systems.iter()).find(|s| s.name == system)
+        self.stages
+            .iter()
+            .flat_map(|s| s.systems.iter())
+            .find(|s| s.name == system)
     }
 
     /// A flat cost report, heaviest first — what the debug overlay prints.
@@ -292,7 +311,11 @@ impl<C> Scheduler<C> {
                 })
             })
             .collect();
-        out.sort_by(|a, b| b.last_ms.partial_cmp(&a.last_ms).unwrap_or(core::cmp::Ordering::Equal));
+        out.sort_by(|a, b| {
+            b.last_ms
+                .partial_cmp(&a.last_ms)
+                .unwrap_or(core::cmp::Ordering::Equal)
+        });
         out
     }
 
@@ -306,7 +329,8 @@ impl<C> Scheduler<C> {
     /// Renders the cost report as an indented table.
     #[must_use]
     pub fn to_table(&self) -> String {
-        let mut out = String::from("stage     system                    last ms   mean ms   runs\n");
+        let mut out =
+            String::from("stage     system                    last ms   mean ms   runs\n");
         for stat in self.stats() {
             out.push_str(&format!(
                 "{:<9} {:<25} {:>7.3}   {:>7.3}   {}{}\n",
@@ -343,7 +367,10 @@ impl<C> Default for Scheduler<C> {
 impl<C> core::fmt::Debug for Scheduler<C> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Scheduler")
-            .field("stages", &self.stages.iter().map(|s| s.name).collect::<Vec<_>>())
+            .field(
+                "stages",
+                &self.stages.iter().map(|s| s.name).collect::<Vec<_>>(),
+            )
             .field("systems", &self.len())
             .field("frames", &self.frames)
             .finish()
@@ -459,7 +486,10 @@ mod tests {
         let stats = s.stats();
         assert_eq!(stats[0].system, "expensive", "{stats:?}");
         // And the ordering invariant always holds.
-        assert!(stats.windows(2).all(|w| w[0].last_ms >= w[1].last_ms), "{stats:?}");
+        assert!(
+            stats.windows(2).all(|w| w[0].last_ms >= w[1].last_ms),
+            "{stats:?}"
+        );
     }
 
     #[test]

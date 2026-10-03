@@ -96,14 +96,24 @@ impl Color {
     #[inline]
     #[must_use]
     pub fn tint(self, factor: f32) -> Self {
-        Self { r: self.r * factor, g: self.g * factor, b: self.b * factor, a: self.a }
+        Self {
+            r: self.r * factor,
+            g: self.g * factor,
+            b: self.b * factor,
+            a: self.a,
+        }
     }
 
     /// Multiplies two colours component-wise (the usual modulation operator).
     #[inline]
     #[must_use]
     pub fn modulate(self, other: Self) -> Self {
-        Self { r: self.r * other.r, g: self.g * other.g, b: self.b * other.b, a: self.a * other.a }
+        Self {
+            r: self.r * other.r,
+            g: self.g * other.g,
+            b: self.b * other.b,
+            a: self.a * other.a,
+        }
     }
 
     /// Horizontal linear interpolation toward `other`.
@@ -157,6 +167,23 @@ impl Color {
         ((c.a as u32) << 24) | ((c.r as u32) << 16) | ((c.g as u32) << 8) | (c.b as u32)
     }
 
+    /// The linear RGB components as a plain array.
+    ///
+    /// The renderer stores its framebuffer as tightly packed `f32` triples, so
+    /// this is the conversion used on that boundary.
+    #[inline]
+    #[must_use]
+    pub const fn to_array3(self) -> [f32; 3] {
+        [self.r, self.g, self.b]
+    }
+
+    /// Builds a colour from a plain linear RGB array (alpha becomes 1).
+    #[inline]
+    #[must_use]
+    pub const fn from_array3(a: [f32; 3]) -> Self {
+        Self::rgb(a[0], a[1], a[2])
+    }
+
     /// Converts to a `Vec4` (`rgb`/`a`) for uniform upload.
     #[inline]
     #[must_use]
@@ -168,7 +195,12 @@ impl Color {
     #[inline]
     #[must_use]
     pub const fn from_vec4(v: Vec4) -> Self {
-        Self { r: v.x, g: v.y, b: v.z, a: v.w }
+        Self {
+            r: v.x,
+            g: v.y,
+            b: v.z,
+            a: v.w,
+        }
     }
 
     /// Source-over alpha compositing in linear space: `self` over `dst`.
@@ -344,7 +376,12 @@ impl Color8 {
         let mix = |s: u8, d: u8| -> u8 {
             (((s as u32) * sa * 255 + (d as u32) * da * inv) / (out_a * 255)).min(255) as u8
         };
-        Self::new(mix(self.r, dst.r), mix(self.g, dst.g), mix(self.b, dst.b), out_a as u8)
+        Self::new(
+            mix(self.r, dst.r),
+            mix(self.g, dst.g),
+            mix(self.b, dst.b),
+            out_a as u8,
+        )
     }
 
     /// Adds another pixel's RGB, saturating. Used by additive glow and light
@@ -379,7 +416,12 @@ impl Color8 {
     pub fn lerp(self, other: Self, t: f32) -> Self {
         let t = t.clamp(0.0, 1.0);
         let f = |a: u8, b: u8| -> u8 { (a as f32 + (b as f32 - a as f32) * t) as u8 };
-        Self::new(f(self.r, other.r), f(self.g, other.g), f(self.b, other.b), f(self.a, other.a))
+        Self::new(
+            f(self.r, other.r),
+            f(self.g, other.g),
+            f(self.b, other.b),
+            f(self.a, other.a),
+        )
     }
 }
 
@@ -413,7 +455,9 @@ impl Palette {
     /// An empty palette.
     #[must_use]
     pub const fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Adds an entry, returning its index.
@@ -443,7 +487,10 @@ impl Palette {
     /// Looks up by name.
     #[must_use]
     pub fn find(&self, name: &str) -> Option<Color8> {
-        self.entries.iter().find(|e| e.name == name).map(|e| e.color)
+        self.entries
+            .iter()
+            .find(|e| e.name == name)
+            .map(|e| e.color)
     }
 
     /// All entries.
@@ -458,16 +505,13 @@ impl Palette {
     /// the project palette. Returns `None` for an empty palette.
     #[must_use]
     pub fn nearest(&self, color: Color8) -> Option<PaletteEntry> {
-        self.entries
-            .iter()
-            .copied()
-            .min_by_key(|e| {
-                let dr = e.color.r as i32 - color.r as i32;
-                let dg = e.color.g as i32 - color.g as i32;
-                let db = e.color.b as i32 - color.b as i32;
-                let da = e.color.a as i32 - color.a as i32;
-                dr * dr + dg * dg + db * db + da * da
-            })
+        self.entries.iter().copied().min_by_key(|e| {
+            let dr = e.color.r as i32 - color.r as i32;
+            let dg = e.color.g as i32 - color.g as i32;
+            let db = e.color.b as i32 - color.b as i32;
+            let da = e.color.a as i32 - color.a as i32;
+            dr * dr + dg * dg + db * db + da * da
+        })
     }
 }
 

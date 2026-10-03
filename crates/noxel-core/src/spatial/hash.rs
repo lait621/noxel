@@ -102,7 +102,11 @@ impl<T> SpatialHash<T> {
 
     /// Inserts an object and returns its handle.
     pub fn insert(&mut self, bounds: Aabb, value: T) -> Handle<HashEntry<T>> {
-        let handle = self.entries.insert(HashEntry { bounds, value, cells: Vec::new() });
+        let handle = self.entries.insert(HashEntry {
+            bounds,
+            value,
+            cells: Vec::new(),
+        });
         self.link(handle);
         handle
     }
@@ -118,7 +122,9 @@ impl<T> SpatialHash<T> {
     /// Returns `false` when the handle is stale. Re-registers only the cells
     /// that changed, so a small motion inside one cell is nearly free.
     pub fn update(&mut self, handle: Handle<HashEntry<T>>, bounds: Aabb) -> bool {
-        let Some(entry) = self.entries.get(handle) else { return false };
+        let Some(entry) = self.entries.get(handle) else {
+            return false;
+        };
         if entry.bounds == bounds {
             return true;
         }
@@ -235,16 +241,14 @@ impl<T> SpatialHash<T> {
     ///
     /// Used for interaction prompts ("press E to talk") and for the occlusion
     /// system's fallback when the primary ray test misses.
-    pub fn nearest(
-        &self,
-        center: Vec3,
-        max_radius: f32,
-    ) -> Option<(Handle<HashEntry<T>>, f32)> {
+    pub fn nearest(&self, center: Vec3, max_radius: f32) -> Option<(Handle<HashEntry<T>>, f32)> {
         let mut candidates = Vec::new();
         self.query_radius(center, max_radius, &mut candidates);
         let mut best: Option<(Handle<HashEntry<T>>, f32)> = None;
         for h in candidates {
-            let Some(e) = self.entries.get(h) else { continue };
+            let Some(e) = self.entries.get(h) else {
+                continue;
+            };
             let d = e.bounds.distance_to_point(center);
             if d > max_radius {
                 continue;
@@ -276,14 +280,20 @@ impl<T> SpatialHash<T> {
                         continue;
                     }
                     // Normalise so a pair seen from two different cells collapses.
-                    if a < b { pairs.push((a, b)) } else { pairs.push((b, a)) }
+                    if a < b {
+                        pairs.push((a, b))
+                    } else {
+                        pairs.push((b, a))
+                    }
                 }
             }
         }
         pairs.sort_unstable();
         pairs.dedup();
         for (a, b) in pairs {
-            let (Some(ea), Some(eb)) = (self.entries.get(a), self.entries.get(b)) else { continue };
+            let (Some(ea), Some(eb)) = (self.entries.get(a), self.entries.get(b)) else {
+                continue;
+            };
             if ea.bounds.intersects(&eb.bounds) {
                 f(a, b);
             }
@@ -326,7 +336,9 @@ impl<T> SpatialHash<T> {
     }
 
     fn link(&mut self, handle: Handle<HashEntry<T>>) {
-        let Some(entry) = self.entries.get(handle) else { return };
+        let Some(entry) = self.entries.get(handle) else {
+            return;
+        };
         let (x0, z0, x1, z1) = self.cell_range(&entry.bounds);
         let mut cells = Vec::with_capacity(((x1 - x0 + 1).max(1) * (z1 - z0 + 1).max(1)) as usize);
         for z in z0..=z1 {
@@ -375,7 +387,10 @@ impl<T> SpatialHash<T> {
     /// The cell containing a world position.
     #[must_use]
     pub fn cell_of(&self, p: Vec3) -> (i32, i32) {
-        ((p.x * self.inv_cell_size).floor() as i32, (p.z * self.inv_cell_size).floor() as i32)
+        (
+            (p.x * self.inv_cell_size).floor() as i32,
+            (p.z * self.inv_cell_size).floor() as i32,
+        )
     }
 }
 
@@ -462,7 +477,10 @@ mod tests {
         let mut h: SpatialHash<&'static str> = SpatialHash::new(1.0);
         h.insert(Aabb::new(Vec3::ZERO, Vec3::new(10.0, 1.0, 10.0)), "big");
         let mut out = Vec::new();
-        h.query_aabb(Aabb::new(Vec3::new(-5.0, -5.0, -5.0), Vec3::new(20.0, 20.0, 20.0)), &mut out);
+        h.query_aabb(
+            Aabb::new(Vec3::new(-5.0, -5.0, -5.0), Vec3::new(20.0, 20.0, 20.0)),
+            &mut out,
+        );
         assert_eq!(out.len(), 1);
     }
 
@@ -515,7 +533,11 @@ mod tests {
         let mut out = Vec::new();
         let ray = Ray::new(Vec3::new(-5.0, 0.5, 0.5), Vec3::X);
         h.query_ray(&ray, &mut out);
-        assert!(out.iter().any(|&x| h.get(x) == Some(&"player")), "{}", out.len());
+        assert!(
+            out.iter().any(|&x| h.get(x) == Some(&"player")),
+            "{}",
+            out.len()
+        );
     }
 
     #[test]

@@ -22,7 +22,10 @@ pub struct Entity {
 impl Entity {
     /// A handle that never resolves. Use it as a "none" sentinel in components
     /// such as `Target(Entity)`.
-    pub const PLACEHOLDER: Self = Self { index: u32::MAX, generation: u32::MAX };
+    pub const PLACEHOLDER: Self = Self {
+        index: u32::MAX,
+        generation: u32::MAX,
+    };
 
     /// Builds an entity id from its parts.
     #[inline]
@@ -64,7 +67,10 @@ impl Entity {
     #[inline]
     #[must_use]
     pub const fn from_bits(bits: u64) -> Self {
-        Self { index: (bits & 0xFFFF_FFFF) as u32, generation: (bits >> 32) as u32 }
+        Self {
+            index: (bits & 0xFFFF_FFFF) as u32,
+            generation: (bits >> 32) as u32,
+        }
     }
 
     /// Converts to a [`Handle`] of any element type.
@@ -109,7 +115,10 @@ pub(crate) struct EntityMeta {
 
 impl EntityMeta {
     pub fn new() -> Self {
-        Self { component_count: 0, name: None }
+        Self {
+            component_count: 0,
+            name: None,
+        }
     }
 }
 

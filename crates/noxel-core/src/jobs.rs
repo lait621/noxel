@@ -50,7 +50,10 @@ struct Shared {
 
 impl Shared {
     fn take_job(&self) -> Option<Job> {
-        self.queue.lock().unwrap_or_else(|e| e.into_inner()).pop_front()
+        self.queue
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .pop_front()
     }
 
     fn finish_job(&self) {
@@ -90,7 +93,11 @@ impl JobPool {
                 .expect("failed to spawn Noxel worker thread");
             workers.push(handle);
         }
-        Self { threads, shared, workers }
+        Self {
+            threads,
+            shared,
+            workers,
+        }
     }
 
     /// A pool with one worker: all `parallel_*` calls run inline.
@@ -140,8 +147,10 @@ impl JobPool {
             return;
         }
         let chunk = len.div_ceil(threads);
-        let ranges: Vec<Range<usize>> =
-            (0..len).step_by(chunk).map(|s| s..(s + chunk).min(len)).collect();
+        let ranges: Vec<Range<usize>> = (0..len)
+            .step_by(chunk)
+            .map(|s| s..(s + chunk).min(len))
+            .collect();
         if ranges.len() == 1 {
             f(ranges[0].clone());
             return;
@@ -229,7 +238,11 @@ impl JobPool {
     /// vertex buffer.
     pub fn spawn(&self, job: impl FnOnce() + Send + 'static) {
         {
-            let mut p = self.shared.pending.lock().unwrap_or_else(|e| e.into_inner());
+            let mut p = self
+                .shared
+                .pending
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             *p += 1;
         }
         if self.threads <= 1 {
@@ -250,7 +263,11 @@ impl JobPool {
     /// Number of submitted jobs that have not finished.
     #[must_use]
     pub fn pending(&self) -> usize {
-        *self.shared.pending.lock().unwrap_or_else(|e| e.into_inner())
+        *self
+            .shared
+            .pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     /// Blocks until every submitted job has finished.
@@ -258,7 +275,11 @@ impl JobPool {
     /// Detached jobs are drained by the workers themselves, so this does not
     /// need to run any of them.
     pub fn wait_idle(&self) {
-        let mut p = self.shared.pending.lock().unwrap_or_else(|e| e.into_inner());
+        let mut p = self
+            .shared
+            .pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         while *p > 0 {
             p = self.shared.idle.wait(p).unwrap_or_else(|e| e.into_inner());
         }
@@ -284,7 +305,10 @@ impl Default for JobPool {
 
 impl core::fmt::Debug for JobPool {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("JobPool").field("threads", &self.threads).field("pending", &self.pending()).finish()
+        f.debug_struct("JobPool")
+            .field("threads", &self.threads)
+            .field("pending", &self.pending())
+            .finish()
     }
 }
 
@@ -376,14 +400,21 @@ impl Progress {
     /// `(done, total)`.
     #[must_use]
     pub fn counts(&self) -> (usize, usize) {
-        (self.inner.done.load(Ordering::Relaxed), self.inner.total.load(Ordering::Relaxed))
+        (
+            self.inner.done.load(Ordering::Relaxed),
+            self.inner.total.load(Ordering::Relaxed),
+        )
     }
 
     /// Completion in `[0, 1]`.
     #[must_use]
     pub fn fraction(&self) -> f32 {
         let (done, total) = self.counts();
-        if total == 0 { 1.0 } else { (done as f32 / total as f32).clamp(0.0, 1.0) }
+        if total == 0 {
+            1.0
+        } else {
+            (done as f32 / total as f32).clamp(0.0, 1.0)
+        }
     }
 
     /// True when all units are done.
@@ -396,7 +427,11 @@ impl Progress {
     /// The human-readable label.
     #[must_use]
     pub fn label(&self) -> String {
-        self.inner.label.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.inner
+            .label
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Replaces the label.
@@ -547,6 +582,10 @@ mod tests {
             }
             assert!(pool.pending() <= 50);
         }
-        assert_eq!(counter.load(Ordering::Relaxed), 50, "Drop must not lose jobs");
+        assert_eq!(
+            counter.load(Ordering::Relaxed),
+            50,
+            "Drop must not lose jobs"
+        );
     }
 }

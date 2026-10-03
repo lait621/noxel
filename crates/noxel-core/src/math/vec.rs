@@ -119,7 +119,11 @@ impl Vec2 {
     #[must_use]
     pub fn normalize_or_zero(self) -> Self {
         let len_sq = self.length_squared();
-        if len_sq > EPSILON * EPSILON { self * (1.0 / len_sq.sqrt()) } else { Self::ZERO }
+        if len_sq > EPSILON * EPSILON {
+            self * (1.0 / len_sq.sqrt())
+        } else {
+            Self::ZERO
+        }
     }
 
     /// Normalises in place, leaving a zero vector untouched.
@@ -361,7 +365,11 @@ impl Vec3 {
     #[must_use]
     pub fn normalize_or_zero(self) -> Self {
         let len_sq = self.length_squared();
-        if len_sq > EPSILON * EPSILON { self * (1.0 / len_sq.sqrt()) } else { Self::ZERO }
+        if len_sq > EPSILON * EPSILON {
+            self * (1.0 / len_sq.sqrt())
+        } else {
+            Self::ZERO
+        }
     }
 
     /// Normalises in place, leaving a zero vector untouched.
@@ -376,7 +384,11 @@ impl Vec3 {
     #[must_use]
     pub fn try_normalize(self) -> Option<Self> {
         let len_sq = self.length_squared();
-        if len_sq > EPSILON * EPSILON { Some(self * (1.0 / len_sq.sqrt())) } else { None }
+        if len_sq > EPSILON * EPSILON {
+            Some(self * (1.0 / len_sq.sqrt()))
+        } else {
+            None
+        }
     }
 
     /// Dot product.
@@ -470,7 +482,11 @@ impl Vec3 {
     pub fn move_towards(self, rhs: Self, max_delta: f32) -> Self {
         let d = rhs - self;
         let len = d.length();
-        if len <= max_delta || len <= EPSILON { rhs } else { self + d * (max_delta / len) }
+        if len <= max_delta || len <= EPSILON {
+            rhs
+        } else {
+            self + d * (max_delta / len)
+        }
     }
 
     /// Spherical linear interpolation between two directions.
@@ -567,7 +583,12 @@ impl Vec4 {
     #[inline]
     #[must_use]
     pub const fn splat(v: f32) -> Self {
-        Self { x: v, y: v, z: v, w: v }
+        Self {
+            x: v,
+            y: v,
+            z: v,
+            w: v,
+        }
     }
 
     /// Drops `w`, producing a [`Vec3`].
@@ -603,7 +624,11 @@ impl Vec4 {
     #[must_use]
     pub fn normalize_or_zero(self) -> Self {
         let len_sq = self.length_squared();
-        if len_sq > EPSILON * EPSILON { self * (1.0 / len_sq.sqrt()) } else { Self::ZERO }
+        if len_sq > EPSILON * EPSILON {
+            self * (1.0 / len_sq.sqrt())
+        } else {
+            Self::ZERO
+        }
     }
 
     /// True when every component is finite.
@@ -620,7 +645,11 @@ impl Vec4 {
     #[inline]
     #[must_use]
     pub fn perspective_divide(self) -> Option<Vec3> {
-        if self.w.abs() <= 1e-7 { None } else { Some(Vec3::new(self.x / self.w, self.y / self.w, self.z / self.w)) }
+        if self.w.abs() <= 1e-7 {
+            None
+        } else {
+            Some(Vec3::new(self.x / self.w, self.y / self.w, self.z / self.w))
+        }
     }
 
     /// Builds from an RGB colour and an alpha value.
@@ -754,7 +783,12 @@ impl Add for Vec4 {
     type Output = Self;
     #[inline]
     fn add(self, rhs: Self) -> Self {
-        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z, self.w + rhs.w)
+        Self::new(
+            self.x + rhs.x,
+            self.y + rhs.y,
+            self.z + rhs.z,
+            self.w + rhs.w,
+        )
     }
 }
 
@@ -762,7 +796,12 @@ impl Sub for Vec4 {
     type Output = Self;
     #[inline]
     fn sub(self, rhs: Self) -> Self {
-        Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z, self.w - rhs.w)
+        Self::new(
+            self.x - rhs.x,
+            self.y - rhs.y,
+            self.z - rhs.z,
+            self.w - rhs.w,
+        )
     }
 }
 

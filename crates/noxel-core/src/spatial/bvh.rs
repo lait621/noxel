@@ -83,20 +83,30 @@ impl<T> Bvh<T> {
     /// An empty tree.
     #[must_use]
     pub fn empty() -> Self {
-        Self { nodes: Vec::new(), items: Vec::new(), root: 0 }
+        Self {
+            nodes: Vec::new(),
+            items: Vec::new(),
+            root: 0,
+        }
     }
 
     /// Builds a tree from `(bounds, value)` pairs.
     #[must_use]
     pub fn build(items: impl IntoIterator<Item = (Aabb, T)>) -> Self {
-        let mut items: Vec<BvhItem<T>> =
-            items.into_iter().map(|(bounds, value)| BvhItem { bounds, value }).collect();
+        let mut items: Vec<BvhItem<T>> = items
+            .into_iter()
+            .map(|(bounds, value)| BvhItem { bounds, value })
+            .collect();
         if items.is_empty() {
             return Self::empty();
         }
         let mut nodes = Vec::with_capacity(items.len() * 2);
         build_node(&mut items, 0, &mut nodes);
-        Self { nodes, items, root: 0 }
+        Self {
+            nodes,
+            items,
+            root: 0,
+        }
     }
 
     /// Number of stored items.
@@ -206,7 +216,10 @@ impl<T> Bvh<T> {
         let mut best_t = f32::INFINITY;
         let mut best: Option<usize> = None;
         let mut stack: Vec<(u32, f32)> = Vec::with_capacity(64);
-        let root_t = self.nodes[self.root as usize].bounds.intersect_ray(ray.origin, ray.dir).map_or(f32::INFINITY, |(t0, _)| t0);
+        let root_t = self.nodes[self.root as usize]
+            .bounds
+            .intersect_ray(ray.origin, ray.dir)
+            .map_or(f32::INFINITY, |(t0, _)| t0);
         if root_t > ray.max_t {
             return None;
         }
@@ -218,7 +231,10 @@ impl<T> Bvh<T> {
             let node = self.nodes[ni as usize];
             if node.count > 0 {
                 let start = node.start_or_right as usize;
-                for (k, item) in self.items[start..start + node.count as usize].iter().enumerate() {
+                for (k, item) in self.items[start..start + node.count as usize]
+                    .iter()
+                    .enumerate()
+                {
                     if let Some((t0, t1)) = item.bounds.intersect_ray(ray.origin, ray.dir) {
                         if t1 < 0.0 || t0 > ray.max_t || t0 >= best_t {
                             continue;
@@ -255,7 +271,11 @@ impl<T> Bvh<T> {
                 }
             }
         }
-        best.map(|i| BvhRayHit { t: best_t, value: &self.items[i].value, bounds: &self.items[i].bounds })
+        best.map(|i| BvhRayHit {
+            t: best_t,
+            value: &self.items[i].value,
+            bounds: &self.items[i].bounds,
+        })
     }
 
     /// Every item the ray hits, sorted by distance.
@@ -268,7 +288,9 @@ impl<T> Bvh<T> {
         stack.push(self.root);
         while let Some(ni) = stack.pop() {
             let node = self.nodes[ni as usize];
-            let Some((t0, t1)) = node.bounds.intersect_ray(ray.origin, ray.dir) else { continue };
+            let Some((t0, t1)) = node.bounds.intersect_ray(ray.origin, ray.dir) else {
+                continue;
+            };
             if t1 < 0.0 || t0 > ray.max_t {
                 continue;
             }
@@ -277,7 +299,11 @@ impl<T> Bvh<T> {
                 for item in &self.items[start..start + node.count as usize] {
                     if let Some((it0, it1)) = item.bounds.intersect_ray(ray.origin, ray.dir) {
                         if it1 >= 0.0 && it0 <= ray.max_t {
-                            out.push(BvhRayHit { t: it0.max(0.0), value: &item.value, bounds: &item.bounds });
+                            out.push(BvhRayHit {
+                                t: it0.max(0.0),
+                                value: &item.value,
+                                bounds: &item.bounds,
+                            });
                         }
                     }
                 }
@@ -305,7 +331,9 @@ impl<T> Bvh<T> {
         stack.push(self.root);
         while let Some(ni) = stack.pop() {
             let node = self.nodes[ni as usize];
-            let Some((t0, t1)) = node.bounds.intersect_ray(ray.origin, ray.dir) else { continue };
+            let Some((t0, t1)) = node.bounds.intersect_ray(ray.origin, ray.dir) else {
+                continue;
+            };
             if t1 < 0.0 || t0 > ray.max_t {
                 continue;
             }
@@ -418,7 +446,11 @@ fn build_node<T>(items: &mut [BvhItem<T>], offset: usize, nodes: &mut Vec<Node>)
     let (left, right) = items.split_at_mut(mid);
     build_node(left, offset, nodes);
     let right_index = build_node(right, offset + mid, nodes);
-    nodes[index as usize] = Node { bounds, start_or_right: right_index, count: 0 };
+    nodes[index as usize] = Node {
+        bounds,
+        start_or_right: right_index,
+        count: 0,
+    };
     index
 }
 
@@ -430,7 +462,10 @@ mod tests {
         Bvh::build((0..100).map(|i| {
             let x = (i % 10) as f32 * 3.0;
             let z = (i / 10) as f32 * 3.0;
-            (Aabb::new(Vec3::new(x, 0.0, z), Vec3::new(x + 1.0, 1.0, z + 1.0)), i)
+            (
+                Aabb::new(Vec3::new(x, 0.0, z), Vec3::new(x + 1.0, 1.0, z + 1.0)),
+                i,
+            )
         }))
     }
 
@@ -450,7 +485,9 @@ mod tests {
     fn single_item() {
         let bvh = Bvh::build([(Aabb::new(Vec3::ZERO, Vec3::ONE), 7u32)]);
         assert_eq!(bvh.len(), 1);
-        let hit = bvh.nearest_ray(&Ray::new(Vec3::new(-5.0, 0.5, 0.5), Vec3::X)).unwrap();
+        let hit = bvh
+            .nearest_ray(&Ray::new(Vec3::new(-5.0, 0.5, 0.5), Vec3::X))
+            .unwrap();
         assert_eq!(*hit.value, 7);
         assert!((hit.t - 5.0).abs() < 1e-4);
     }
@@ -459,7 +496,10 @@ mod tests {
     fn query_aabb_finds_the_right_items() {
         let bvh = sample();
         let mut out = Vec::new();
-        bvh.query_aabb(&Aabb::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::splat(0.5)), &mut out);
+        bvh.query_aabb(
+            &Aabb::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::splat(0.5)),
+            &mut out,
+        );
         assert_eq!(out, vec![&0u32]);
     }
 
@@ -467,7 +507,9 @@ mod tests {
     fn nearest_ray_picks_the_closest() {
         let bvh = sample();
         // Ray along +X at z = 0.5 crosses items 0,1,2,... in that order.
-        let hit = bvh.nearest_ray(&Ray::new(Vec3::new(-10.0, 0.5, 0.5), Vec3::X)).unwrap();
+        let hit = bvh
+            .nearest_ray(&Ray::new(Vec3::new(-10.0, 0.5, 0.5), Vec3::X))
+            .unwrap();
         assert_eq!(*hit.value, 0);
         assert!(hit.t < 11.0, "t = {}", hit.t);
     }
@@ -478,19 +520,34 @@ mod tests {
         let mut out = Vec::new();
         bvh.query_ray(&Ray::new(Vec3::new(-10.0, 0.5, 0.5), Vec3::X), &mut out);
         assert!(out.len() >= 10, "should cross the whole row: {}", out.len());
-        assert!(out.windows(2).all(|w| w[0].t <= w[1].t), "hits must be sorted");
+        assert!(
+            out.windows(2).all(|w| w[0].t <= w[1].t),
+            "hits must be sorted"
+        );
     }
 
     #[test]
     fn any_hit_segment_detects_and_ignores() {
         let bvh = sample();
-        assert!(bvh.any_hit_segment(Vec3::new(-10.0, 0.5, 0.5), Vec3::new(40.0, 0.5, 0.5), |_| false));
+        assert!(bvh.any_hit_segment(
+            Vec3::new(-10.0, 0.5, 0.5),
+            Vec3::new(40.0, 0.5, 0.5),
+            |_| false
+        ));
         assert!(
-            !bvh.any_hit_segment(Vec3::new(-10.0, 50.0, 0.5), Vec3::new(40.0, 50.0, 0.5), |_| false),
+            !bvh.any_hit_segment(
+                Vec3::new(-10.0, 50.0, 0.5),
+                Vec3::new(40.0, 50.0, 0.5),
+                |_| false
+            ),
             "a segment far above the boxes must not hit"
         );
         assert!(
-            !bvh.any_hit_segment(Vec3::new(-10.0, 0.5, 0.5), Vec3::new(40.0, 0.5, 0.5), |_| true),
+            !bvh.any_hit_segment(
+                Vec3::new(-10.0, 0.5, 0.5),
+                Vec3::new(40.0, 0.5, 0.5),
+                |_| true
+            ),
             "ignoring everything must report no hit"
         );
     }
@@ -499,7 +556,11 @@ mod tests {
     fn any_hit_segment_respects_segment_length() {
         let bvh = sample();
         // Stop before reaching the first box at x = 0.
-        assert!(!bvh.any_hit_segment(Vec3::new(-10.0, 0.5, 0.5), Vec3::new(-5.0, 0.5, 0.5), |_| false));
+        assert!(!bvh.any_hit_segment(
+            Vec3::new(-10.0, 0.5, 0.5),
+            Vec3::new(-5.0, 0.5, 0.5),
+            |_| false
+        ));
     }
 
     #[test]
@@ -511,8 +572,12 @@ mod tests {
 
         let mut via_bvh = Vec::new();
         bvh.query_frustum(&frustum, &mut via_bvh);
-        let via_linear: Vec<&u32> =
-            bvh.items().iter().filter(|i| frustum.intersects_aabb(&i.bounds)).map(|i| &i.value).collect();
+        let via_linear: Vec<&u32> = bvh
+            .items()
+            .iter()
+            .filter(|i| frustum.intersects_aabb(&i.bounds))
+            .map(|i| &i.value)
+            .collect();
         assert_eq!(via_bvh.len(), via_linear.len());
         for v in &via_bvh {
             assert!(via_linear.contains(v));
@@ -541,7 +606,10 @@ mod tests {
     fn all_items_are_reachable() {
         let bvh = sample();
         let mut seen = Vec::new();
-        bvh.query_aabb(&Aabb::new(Vec3::splat(-100.0), Vec3::splat(100.0)), &mut seen);
+        bvh.query_aabb(
+            &Aabb::new(Vec3::splat(-100.0), Vec3::splat(100.0)),
+            &mut seen,
+        );
         assert_eq!(seen.len(), 100);
         let mut sorted: Vec<u32> = seen.into_iter().copied().collect();
         sorted.sort_unstable();

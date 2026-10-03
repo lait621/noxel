@@ -31,7 +31,11 @@ pub struct Handle<T> {
 
 impl<T> Handle<T> {
     /// A handle that never resolves to anything.
-    pub const INVALID: Self = Self { index: u32::MAX, generation: u32::MAX, _marker: PhantomData };
+    pub const INVALID: Self = Self {
+        index: u32::MAX,
+        generation: u32::MAX,
+        _marker: PhantomData,
+    };
 
     /// The slot index.
     #[inline]
@@ -147,28 +151,50 @@ impl<T> SlotMap<T> {
     /// An empty map.
     #[must_use]
     pub const fn new() -> Self {
-        Self { slots: Vec::new(), free: Vec::new(), len: 0 }
+        Self {
+            slots: Vec::new(),
+            free: Vec::new(),
+            len: 0,
+        }
     }
 
     /// An empty map with room for `capacity` elements.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { slots: Vec::with_capacity(capacity), free: Vec::new(), len: 0 }
+        Self {
+            slots: Vec::with_capacity(capacity),
+            free: Vec::new(),
+            len: 0,
+        }
     }
 
     /// Inserts a value and returns its handle.
     pub fn insert(&mut self, value: T) -> Handle<T> {
         if let Some(index) = self.free.pop() {
             let slot = &mut self.slots[index as usize];
-            debug_assert!(slot.value.is_none(), "free list pointed at an occupied slot");
+            debug_assert!(
+                slot.value.is_none(),
+                "free list pointed at an occupied slot"
+            );
             slot.value = Some(value);
             self.len += 1;
-            Handle { index, generation: slot.generation, _marker: PhantomData }
+            Handle {
+                index,
+                generation: slot.generation,
+                _marker: PhantomData,
+            }
         } else {
             let index = self.slots.len() as u32;
-            self.slots.push(Slot { generation: 0, value: Some(value) });
+            self.slots.push(Slot {
+                generation: 0,
+                value: Some(value),
+            });
             self.len += 1;
-            Handle { index, generation: 0, _marker: PhantomData }
+            Handle {
+                index,
+                generation: 0,
+                _marker: PhantomData,
+            }
         }
     }
 
@@ -242,7 +268,11 @@ impl<T> SlotMap<T> {
         let (la, lb) = (&mut left[lo], &mut right[0]);
         let va = la.value.as_mut()?;
         let vb = lb.value.as_mut()?;
-        if ai < bi { Some((va, vb)) } else { Some((vb, va)) }
+        if ai < bi {
+            Some((va, vb))
+        } else {
+            Some((vb, va))
+        }
     }
 
     /// Number of live elements.
@@ -272,7 +302,14 @@ impl<T> SlotMap<T> {
     pub fn iter(&self) -> impl Iterator<Item = (Handle<T>, &T)> + '_ {
         self.slots.iter().enumerate().filter_map(|(i, slot)| {
             slot.value.as_ref().map(|v| {
-                (Handle { index: i as u32, generation: slot.generation, _marker: PhantomData }, v)
+                (
+                    Handle {
+                        index: i as u32,
+                        generation: slot.generation,
+                        _marker: PhantomData,
+                    },
+                    v,
+                )
             })
         })
     }
@@ -282,7 +319,14 @@ impl<T> SlotMap<T> {
         self.slots.iter_mut().enumerate().filter_map(|(i, slot)| {
             let generation = slot.generation;
             slot.value.as_mut().map(move |v| {
-                (Handle { index: i as u32, generation, _marker: PhantomData }, v)
+                (
+                    Handle {
+                        index: i as u32,
+                        generation,
+                        _marker: PhantomData,
+                    },
+                    v,
+                )
             })
         })
     }
@@ -308,8 +352,14 @@ impl<T> SlotMap<T> {
         let mut removed = 0;
         for i in 0..self.slots.len() {
             let generation = self.slots[i].generation;
-            let Some(value) = self.slots[i].value.as_mut() else { continue };
-            let handle = Handle { index: i as u32, generation, _marker: PhantomData };
+            let Some(value) = self.slots[i].value.as_mut() else {
+                continue;
+            };
+            let handle = Handle {
+                index: i as u32,
+                generation,
+                _marker: PhantomData,
+            };
             if keep(handle, value) {
                 continue;
             }
@@ -350,7 +400,11 @@ impl<T> SlotMap<T> {
     /// Fraction of allocated slots that are in use, in `[0, 1]`.
     #[must_use]
     pub fn occupancy(&self) -> f32 {
-        if self.slots.is_empty() { 1.0 } else { self.len as f32 / self.slots.len() as f32 }
+        if self.slots.is_empty() {
+            1.0
+        } else {
+            self.len as f32 / self.slots.len() as f32
+        }
     }
 }
 
@@ -391,13 +445,21 @@ impl<T> FreeList<T> {
     /// An empty pool.
     #[must_use]
     pub const fn new() -> Self {
-        Self { free: Vec::new(), created: 0, live: 0 }
+        Self {
+            free: Vec::new(),
+            created: 0,
+            live: 0,
+        }
     }
 
     /// An empty pool with room for `capacity` recycled values.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { free: Vec::with_capacity(capacity), created: 0, live: 0 }
+        Self {
+            free: Vec::with_capacity(capacity),
+            created: 0,
+            live: 0,
+        }
     }
 
     /// Takes a value from the pool, creating one with `make` when it is empty.
@@ -486,13 +548,19 @@ impl BitSet {
     /// An empty set.
     #[must_use]
     pub const fn new() -> Self {
-        Self { words: Vec::new(), len: 0 }
+        Self {
+            words: Vec::new(),
+            len: 0,
+        }
     }
 
     /// An empty set able to hold `bits` bits without reallocating.
     #[must_use]
     pub fn with_capacity(bits: usize) -> Self {
-        Self { words: vec![0; bits.div_ceil(64)], len: 0 }
+        Self {
+            words: vec![0; bits.div_ceil(64)],
+            len: 0,
+        }
     }
 
     /// The number of bits the set can address without growing.
@@ -559,13 +627,19 @@ impl BitSet {
     #[inline]
     #[must_use]
     pub fn contains(&self, bit: usize) -> bool {
-        self.words.get(bit / 64).is_some_and(|w| w & (1u64 << (bit % 64)) != 0)
+        self.words
+            .get(bit / 64)
+            .is_some_and(|w| w & (1u64 << (bit % 64)) != 0)
     }
 
     /// Flips a bit, growing as needed.
     #[inline]
     pub fn toggle(&mut self, bit: usize) {
-        if self.contains(bit) { self.remove(bit) } else { self.insert(bit) }
+        if self.contains(bit) {
+            self.remove(bit)
+        } else {
+            self.insert(bit)
+        }
     }
 
     /// Sets every bit in `0..bits`.
@@ -631,7 +705,11 @@ impl BitSet {
 
     /// Iterates the indices of set bits, ascending.
     pub fn iter(&self) -> BitSetIter<'_> {
-        BitSetIter { set: self, word: 0, bits: 0 }
+        BitSetIter {
+            set: self,
+            word: 0,
+            bits: 0,
+        }
     }
 
     /// Number of words backing the set, for the GUI's statistics panel.
@@ -699,7 +777,11 @@ impl<T> RingBuffer<T> {
         let n = capacity.max(1);
         let mut data = Vec::with_capacity(n);
         data.resize_with(n, || None);
-        Self { data, head: 0, len: 0 }
+        Self {
+            data,
+            head: 0,
+            len: 0,
+        }
     }
 
     /// Capacity.
@@ -743,7 +825,11 @@ impl<T> RingBuffer<T> {
     /// The most recently pushed value.
     #[must_use]
     pub fn last(&self) -> Option<&T> {
-        if self.len == 0 { None } else { self.data[(self.head + self.data.len() - 1) % self.data.len()].as_ref() }
+        if self.len == 0 {
+            None
+        } else {
+            self.data[(self.head + self.data.len() - 1) % self.data.len()].as_ref()
+        }
     }
 
     /// The oldest surviving value.
@@ -822,7 +908,11 @@ mod tests {
         let b = m.insert("b");
         assert_eq!(a.index(), b.index(), "the slot should be reused");
         assert_ne!(a.generation(), b.generation());
-        assert_eq!(m.get(a), None, "the stale handle must not see the new value");
+        assert_eq!(
+            m.get(a),
+            None,
+            "the stale handle must not see the new value"
+        );
         assert_eq!(m.get(b), Some(&"b"));
     }
 
@@ -867,7 +957,10 @@ mod tests {
         m.remove(a);
         let d = m.insert(4);
         let keys: Vec<u32> = m.keys().map(|h| h.index()).collect();
-        assert!(keys.windows(2).all(|w| w[0] < w[1]), "keys must ascend: {keys:?}");
+        assert!(
+            keys.windows(2).all(|w| w[0] < w[1]),
+            "keys must ascend: {keys:?}"
+        );
         assert!(m.contains(c) && m.contains(d));
     }
 

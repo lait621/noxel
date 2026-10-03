@@ -75,7 +75,6 @@ name = "noxel-physics"
 version = "0.1.0"
 dependencies = [
  "noxel-core",
- "noxel-ecs",
 ]
 
 [[package]]

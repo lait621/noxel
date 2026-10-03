@@ -203,12 +203,20 @@ pub fn fbm_2d(x: f32, y: f32, seed: u64, octaves: u32, lacunarity: f32, gain: f3
     let mut sum = 0.0;
     let mut norm = 0.0;
     for o in 0..octaves.max(1) {
-        sum += perlin_2d(x * freq, y * freq, seed.wrapping_add(o as u64 * 0x9E37_79B9)) * amp;
+        sum += perlin_2d(
+            x * freq,
+            y * freq,
+            seed.wrapping_add(o as u64 * 0x9E37_79B9),
+        ) * amp;
         norm += amp;
         amp *= gain;
         freq *= lacunarity;
     }
-    if norm > 0.0 { (sum / norm).clamp(-1.0, 1.0) } else { 0.0 }
+    if norm > 0.0 {
+        (sum / norm).clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 /// Like [`fbm_2d`] but using [`simplex_2d`] for each octave.
@@ -219,12 +227,20 @@ pub fn fbm_simplex_2d(x: f32, y: f32, seed: u64, octaves: u32, lacunarity: f32, 
     let mut sum = 0.0;
     let mut norm = 0.0;
     for o in 0..octaves.max(1) {
-        sum += simplex_2d(x * freq, y * freq, seed.wrapping_add(o as u64 * 0x9E37_79B9)) * amp;
+        sum += simplex_2d(
+            x * freq,
+            y * freq,
+            seed.wrapping_add(o as u64 * 0x9E37_79B9),
+        ) * amp;
         norm += amp;
         amp *= gain;
         freq *= lacunarity;
     }
-    if norm > 0.0 { (sum / norm).clamp(-1.0, 1.0) } else { 0.0 }
+    if norm > 0.0 {
+        (sum / norm).clamp(-1.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 /// Ridged multifractal: sharp crests, good for mountain ranges and cliff lines.
@@ -237,13 +253,23 @@ pub fn ridged_2d(x: f32, y: f32, seed: u64, octaves: u32, lacunarity: f32, gain:
     let mut sum = 0.0;
     let mut norm = 0.0;
     for o in 0..octaves.max(1) {
-        let n = 1.0 - perlin_2d(x * freq, y * freq, seed.wrapping_add(o as u64 * 0x85EB_CA6B)).abs();
+        let n = 1.0
+            - perlin_2d(
+                x * freq,
+                y * freq,
+                seed.wrapping_add(o as u64 * 0x85EB_CA6B),
+            )
+            .abs();
         sum += n * n * amp;
         norm += amp;
         amp *= gain;
         freq *= lacunarity;
     }
-    if norm > 0.0 { (sum / norm).clamp(0.0, 1.0) } else { 0.0 }
+    if norm > 0.0 {
+        (sum / norm).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 /// Domain-warped fbm: samples `fbm` at coordinates displaced by another `fbm`.
@@ -251,16 +277,17 @@ pub fn ridged_2d(x: f32, y: f32, seed: u64, octaves: u32, lacunarity: f32, gain:
 /// This is what turns a generic noise field into terrain with rivers, bays and
 /// believable coastlines. `warp_strength` is in noise units; 0.5–2.0 works well.
 #[must_use]
-pub fn warped_fbm_2d(
-    x: f32,
-    y: f32,
-    seed: u64,
-    octaves: u32,
-    warp_strength: f32,
-) -> f32 {
+pub fn warped_fbm_2d(x: f32, y: f32, seed: u64, octaves: u32, warp_strength: f32) -> f32 {
     let wx = fbm_2d(x + 5.2, y + 1.3, seed ^ 0x1234, 3, 2.0, 0.5);
     let wy = fbm_2d(x + 9.7, y + 4.8, seed ^ 0x5678, 3, 2.0, 0.5);
-    fbm_2d(x + wx * warp_strength, y + wy * warp_strength, seed, octaves, 2.0, 0.5)
+    fbm_2d(
+        x + wx * warp_strength,
+        y + wy * warp_strength,
+        seed,
+        octaves,
+        2.0,
+        0.5,
+    )
 }
 
 /// Value noise in `[-1, 1]` on a 3D lattice, for cave systems and ore veins.
@@ -374,7 +401,10 @@ mod tests {
         for i in 1..500 {
             let x = i as f32 * 0.01;
             let v = perlin_2d(x, 0.3, 5);
-            assert!((v - prev).abs() < 0.2, "discontinuity at x={x}: {prev} -> {v}");
+            assert!(
+                (v - prev).abs() < 0.2,
+                "discontinuity at x={x}: {prev} -> {v}"
+            );
             prev = v;
         }
     }
@@ -404,7 +434,14 @@ mod tests {
         for octaves in [1u32, 2, 4, 8] {
             let mut hi: f32 = 0.0;
             for i in 0..2000 {
-                let v = fbm_2d(i as f32 * 0.05, (i as f32 * 0.013).cos() * 20.0, 2, octaves, 2.0, 0.5);
+                let v = fbm_2d(
+                    i as f32 * 0.05,
+                    (i as f32 * 0.013).cos() * 20.0,
+                    2,
+                    octaves,
+                    2.0,
+                    0.5,
+                );
                 hi = hi.max(v.abs());
             }
             assert!(hi <= 1.001, "octaves {octaves} produced {hi}");
@@ -420,7 +457,9 @@ mod tests {
             let n = 500;
             for i in 0..n {
                 let x = i as f32 * 0.02;
-                acc += (fbm_2d(x + 0.02, 0.5, 1, octaves, 2.0, 0.5) - fbm_2d(x, 0.5, 1, octaves, 2.0, 0.5)).abs();
+                acc += (fbm_2d(x + 0.02, 0.5, 1, octaves, 2.0, 0.5)
+                    - fbm_2d(x, 0.5, 1, octaves, 2.0, 0.5))
+                .abs();
             }
             acc / n as f32
         };
@@ -461,7 +500,10 @@ mod tests {
     fn warped_fbm_differs_but_stays_bounded() {
         let plain = fbm_2d(12.0, 7.0, 1, 4, 2.0, 0.5);
         let warped = warped_fbm_2d(12.0, 7.0, 1, 4, 1.0);
-        assert!((warped - plain).abs() > 1e-4, "warping must change the field");
+        assert!(
+            (warped - plain).abs() > 1e-4,
+            "warping must change the field"
+        );
         assert!(warped.abs() <= 1.001);
     }
 

@@ -41,7 +41,10 @@ struct SparseEntry {
 }
 
 impl SparseEntry {
-    const INVALID: Self = Self { generation: u32::MAX, dense: NONE };
+    const INVALID: Self = Self {
+        generation: u32::MAX,
+        dense: NONE,
+    };
 }
 
 /// A sparse set of component values indexed by entity.
@@ -57,7 +60,11 @@ impl<T> Storage<T> {
     /// An empty storage.
     #[must_use]
     pub fn new() -> Self {
-        Self { sparse: Vec::new(), dense: Vec::new(), changed: Vec::new() }
+        Self {
+            sparse: Vec::new(),
+            dense: Vec::new(),
+            changed: Vec::new(),
+        }
     }
 
     /// An empty storage with room for `capacity` components.
@@ -115,7 +122,10 @@ impl<T> Storage<T> {
         let dense = self.dense.len() as u32;
         self.dense.push((entity, value));
         self.changed.push(tick);
-        self.sparse[idx] = SparseEntry { generation: entity.generation(), dense };
+        self.sparse[idx] = SparseEntry {
+            generation: entity.generation(),
+            dense,
+        };
         None
     }
 
@@ -395,7 +405,11 @@ mod tests {
         let _ = s.get_mut(e(0, 0), 9);
         assert_eq!(s.changed_at(e(0, 0)), Some(9));
         let _ = s.get_mut_silent(e(0, 0));
-        assert_eq!(s.changed_at(e(0, 0)), Some(9), "silent access must not bump");
+        assert_eq!(
+            s.changed_at(e(0, 0)),
+            Some(9),
+            "silent access must not bump"
+        );
     }
 
     #[test]

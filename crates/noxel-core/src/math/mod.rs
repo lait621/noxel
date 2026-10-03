@@ -35,15 +35,14 @@ pub mod vec;
 pub use color::{Color, Color8, Palette, PaletteEntry};
 pub use mat::{Mat3, Mat4};
 pub use noise::{
-    fbm_2d, fbm_simplex_2d, hash01_2d, hash01_3d, hash_signed_2d, perlin_2d, ridged_2d,
-    simplex_2d, tileable_value_2d, value_2d, value_3d, warped_fbm_2d, worley_2d,
+    fbm_2d, fbm_simplex_2d, hash_signed_2d, hash01_2d, hash01_3d, perlin_2d, ridged_2d, simplex_2d,
+    tileable_value_2d, value_2d, value_3d, warped_fbm_2d, worley_2d,
 };
 pub use quat::Quat;
 pub use scalar::{
     EPSILON, RAY_EPSILON, TAU, angle_delta, approx_eq, clamp_safe, damp, damp_factor, div_floor,
-    inv_lerp, lerp, lerp_clamped, linear_to_srgb, rem_euclid_i32, rotate_towards, smoothstep,
-    smootherstep, srgb_to_linear, to_degrees, to_radians, tonemap_aces, tonemap_reinhard,
-    wrap_angle,
+    inv_lerp, lerp, lerp_clamped, linear_to_srgb, rem_euclid_i32, rotate_towards, smootherstep,
+    smoothstep, srgb_to_linear, to_degrees, to_radians, tonemap_aces, tonemap_reinhard, wrap_angle,
 };
 pub use shapes::{Aabb, Frustum, Plane, Ray, Rect, Sphere, Transform};
 pub use vec::{Vec2, Vec3, Vec4};
@@ -74,7 +73,10 @@ impl GridPos {
     #[inline]
     #[must_use]
     pub const fn offset(self, dx: i32, dy: i32) -> Self {
-        Self { x: self.x + dx, y: self.y + dy }
+        Self {
+            x: self.x + dx,
+            y: self.y + dy,
+        }
     }
 
     /// Chebyshev distance (the number of steps a king makes).
@@ -179,7 +181,10 @@ impl ChunkPos {
     #[inline]
     #[must_use]
     pub const fn from_grid(g: GridPos, tiles_per_chunk: i32) -> Self {
-        Self::new(div_floor(g.x, tiles_per_chunk), div_floor(g.y, tiles_per_chunk))
+        Self::new(
+            div_floor(g.x, tiles_per_chunk),
+            div_floor(g.y, tiles_per_chunk),
+        )
     }
 
     /// The world-space centre of this chunk.
@@ -198,7 +203,11 @@ impl ChunkPos {
     #[must_use]
     pub fn to_aabb(self, chunk_world_size: f32, y_min: f32, y_max: f32) -> Aabb {
         Aabb::new(
-            Vec3::new(self.x as f32 * chunk_world_size, y_min, self.y as f32 * chunk_world_size),
+            Vec3::new(
+                self.x as f32 * chunk_world_size,
+                y_min,
+                self.y as f32 * chunk_world_size,
+            ),
             Vec3::new(
                 (self.x + 1) as f32 * chunk_world_size,
                 y_max,
@@ -246,7 +255,10 @@ mod tests {
         let cells = GridPos::new(0, 0).in_radius(2);
         assert!(cells.contains(&GridPos::new(2, 0)));
         assert!(cells.contains(&GridPos::new(1, 1)));
-        assert!(!cells.contains(&GridPos::new(2, 2)), "corner must be excluded");
+        assert!(
+            !cells.contains(&GridPos::new(2, 2)),
+            "corner must be excluded"
+        );
     }
 
     #[test]
@@ -260,8 +272,14 @@ mod tests {
     #[test]
     fn chunk_from_world_handles_negatives() {
         // -0.5 is inside chunk -1, not chunk 0: floor, not truncation.
-        assert_eq!(ChunkPos::from_world(Vec3::new(-0.5, 0.0, -0.5), 32.0), ChunkPos::new(-1, -1));
-        assert_eq!(ChunkPos::from_world(Vec3::new(0.5, 0.0, 0.5), 32.0), ChunkPos::new(0, 0));
+        assert_eq!(
+            ChunkPos::from_world(Vec3::new(-0.5, 0.0, -0.5), 32.0),
+            ChunkPos::new(-1, -1)
+        );
+        assert_eq!(
+            ChunkPos::from_world(Vec3::new(0.5, 0.0, 0.5), 32.0),
+            ChunkPos::new(0, 0)
+        );
     }
 
     #[test]

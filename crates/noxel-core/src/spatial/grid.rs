@@ -131,7 +131,9 @@ impl<T> UniformGrid<T> {
     /// door or bridge that changes once, not for per-frame motion. Use
     /// [`crate::spatial::SpatialHash`] for that.
     pub fn update_bounds(&mut self, index: u32, bounds: Aabb) {
-        let Some(entry) = self.items.get_mut(index as usize) else { return };
+        let Some(entry) = self.items.get_mut(index as usize) else {
+            return;
+        };
         entry.bounds = bounds;
         self.unregister(index);
         self.register(index);
@@ -207,14 +209,22 @@ impl<T> UniformGrid<T> {
     /// The world-space extent of the grid along X and Z.
     #[must_use]
     pub fn world_size(&self) -> (f32, f32) {
-        (self.dims.0 as f32 * self.cell_size, self.dims.1 as f32 * self.cell_size)
+        (
+            self.dims.0 as f32 * self.cell_size,
+            self.dims.1 as f32 * self.cell_size,
+        )
     }
 
     /// Items whose bounds overlap `query`, each reported exactly once.
     ///
     /// `scratch` is reused between calls; pass the same buffer every frame to
     /// avoid allocating.
-    pub fn query_aabb_into<'a>(&'a self, query: Aabb, out: &mut Vec<&'a T>, scratch: &mut Vec<u32>) {
+    pub fn query_aabb_into<'a>(
+        &'a self,
+        query: Aabb,
+        out: &mut Vec<&'a T>,
+        scratch: &mut Vec<u32>,
+    ) {
         out.clear();
         scratch.clear();
         let (x0, z0, x1, z1) = self.clamped_cell_range(&query);
@@ -331,10 +341,16 @@ impl<T> UniformGrid<T> {
             } else {
                 ((if dz > 0.0 { cz + 1 } else { cz }) as f32 - oz) / (dz * self.inv_cell_size)
             };
-            let t_delta_x =
-                if dx.abs() < 1e-9 { f32::INFINITY } else { 1.0 / (dx.abs() * self.inv_cell_size) };
-            let t_delta_z =
-                if dz.abs() < 1e-9 { f32::INFINITY } else { 1.0 / (dz.abs() * self.inv_cell_size) };
+            let t_delta_x = if dx.abs() < 1e-9 {
+                f32::INFINITY
+            } else {
+                1.0 / (dx.abs() * self.inv_cell_size)
+            };
+            let t_delta_z = if dz.abs() < 1e-9 {
+                f32::INFINITY
+            } else {
+                1.0 / (dz.abs() * self.inv_cell_size)
+            };
             let limit = ray.max_t;
 
             // A straight line crosses at most dims.0 + dims.1 + 2 cells.
@@ -399,8 +415,11 @@ impl<T> UniformGrid<T> {
     /// An estimate of heap usage in bytes, for the statistics panel.
     #[must_use]
     pub fn memory_bytes(&self) -> usize {
-        let buckets: usize =
-            self.cells.iter().map(|c| c.capacity() * core::mem::size_of::<u32>()).sum();
+        let buckets: usize = self
+            .cells
+            .iter()
+            .map(|c| c.capacity() * core::mem::size_of::<u32>())
+            .sum();
         let cells_vec = self.cells.capacity() * core::mem::size_of::<Vec<u32>>();
         let items = self.items.capacity() * core::mem::size_of::<GridEntry<T>>();
         let overflow = self.overflow.capacity() * core::mem::size_of::<u32>();
@@ -448,9 +467,16 @@ impl<T> UniformGrid<T> {
     /// Iterates every non-empty cell as `(cell_coord, item_indices)`.
     pub fn iter_cells(&self) -> impl Iterator<Item = (GridPos, &[u32])> + '_ {
         let dim_x = self.dims.0 as usize;
-        self.cells.iter().enumerate().filter(|(_, c)| !c.is_empty()).map(move |(i, c)| {
-            (GridPos::new((i % dim_x) as i32, (i / dim_x) as i32), c.as_slice())
-        })
+        self.cells
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| !c.is_empty())
+            .map(move |(i, c)| {
+                (
+                    GridPos::new((i % dim_x) as i32, (i / dim_x) as i32),
+                    c.as_slice(),
+                )
+            })
     }
 
     /// The number of items that were diverted to the overflow list.
@@ -469,9 +495,18 @@ mod tests {
             Aabb::new(Vec3::new(-50.0, 0.0, -50.0), Vec3::new(50.0, 20.0, 50.0)),
             4.0,
             [
-                (Aabb::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 3.0, 2.0)), "house"),
-                (Aabb::new(Vec3::new(30.0, 0.0, 30.0), Vec3::new(32.0, 3.0, 32.0)), "barn"),
-                (Aabb::new(Vec3::new(-40.0, 0.0, -40.0), Vec3::new(-38.0, 2.0, -38.0)), "well"),
+                (
+                    Aabb::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 3.0, 2.0)),
+                    "house",
+                ),
+                (
+                    Aabb::new(Vec3::new(30.0, 0.0, 30.0), Vec3::new(32.0, 3.0, 32.0)),
+                    "barn",
+                ),
+                (
+                    Aabb::new(Vec3::new(-40.0, 0.0, -40.0), Vec3::new(-38.0, 2.0, -38.0)),
+                    "well",
+                ),
             ],
         )
     }
@@ -489,10 +524,16 @@ mod tests {
         let g = UniformGrid::build(
             Aabb::new(Vec3::ZERO, Vec3::new(100.0, 10.0, 100.0)),
             1.0,
-            [(Aabb::new(Vec3::new(40.0, 0.0, 40.0), Vec3::new(60.0, 2.0, 60.0)), "big")],
+            [(
+                Aabb::new(Vec3::new(40.0, 0.0, 40.0), Vec3::new(60.0, 2.0, 60.0)),
+                "big",
+            )],
         );
         let mut hits = Vec::new();
-        g.query_aabb(Aabb::new(Vec3::ZERO, Vec3::new(100.0, 5.0, 100.0)), &mut hits);
+        g.query_aabb(
+            Aabb::new(Vec3::ZERO, Vec3::new(100.0, 5.0, 100.0)),
+            &mut hits,
+        );
         assert_eq!(hits, vec![&"big"], "a 20x20 item must be reported once");
     }
 
@@ -550,7 +591,10 @@ mod tests {
         let mut hits = Vec::new();
         let ray = Ray::with_max_t(Vec3::new(-40.0, 1.0, 30.0), Vec3::X, 5.0);
         g.query_ray(&ray, &mut hits);
-        assert!(hits.is_empty(), "ray stops before reaching anything: {hits:?}");
+        assert!(
+            hits.is_empty(),
+            "ray stops before reaching anything: {hits:?}"
+        );
     }
 
     #[test]
@@ -558,7 +602,10 @@ mod tests {
         let mut g: UniformGrid<&'static str> =
             UniformGrid::empty(Aabb::new(Vec3::ZERO, Vec3::new(1000.0, 10.0, 1000.0)), 1.0);
         g.set_max_cells_per_item(4);
-        g.insert(Aabb::new(Vec3::new(100.0, 0.0, 100.0), Vec3::new(900.0, 5.0, 900.0)), "huge");
+        g.insert(
+            Aabb::new(Vec3::new(100.0, 0.0, 100.0), Vec3::new(900.0, 5.0, 900.0)),
+            "huge",
+        );
         assert_eq!(g.overflow_count(), 1);
 
         let mut hits = Vec::new();
@@ -569,7 +616,10 @@ mod tests {
         assert_eq!(hits, vec![&"huge"]);
 
         let mut all = Vec::new();
-        g.query_aabb(Aabb::new(Vec3::ZERO, Vec3::new(1000.0, 10.0, 1000.0)), &mut all);
+        g.query_aabb(
+            Aabb::new(Vec3::ZERO, Vec3::new(1000.0, 10.0, 1000.0)),
+            &mut all,
+        );
         assert_eq!(all.len(), 1, "must not be reported twice");
     }
 

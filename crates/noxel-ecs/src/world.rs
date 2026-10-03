@@ -166,7 +166,9 @@ impl World {
     /// The name bound to an entity, if any.
     #[must_use]
     pub fn name(&self, entity: Entity) -> Option<&str> {
-        self.entities.get(entity.to_handle_of()).and_then(|m| m.name.as_deref())
+        self.entities
+            .get(entity.to_handle_of())
+            .and_then(|m| m.name.as_deref())
     }
 
     /// Looks up an entity by name.
@@ -339,7 +341,9 @@ impl World {
     /// Every entity carrying `T`, in storage order.
     #[must_use]
     pub fn entities_with<T: Component>(&self) -> Vec<Entity> {
-        self.storage::<T>().map(|s| s.iter_entities().collect()).unwrap_or_default()
+        self.storage::<T>()
+            .map(|s| s.iter_entities().collect())
+            .unwrap_or_default()
     }
 
     /// Every entity id with its `&T`, collecting to a `Vec`.
@@ -347,7 +351,9 @@ impl World {
     /// Allocating; for the non-allocating form use [`World::for_each`].
     #[must_use]
     pub fn collect_with<T: Component>(&self) -> Vec<(Entity, &T)> {
-        self.storage::<T>().map(|s| s.iter().collect()).unwrap_or_default()
+        self.storage::<T>()
+            .map(|s| s.iter().collect())
+            .unwrap_or_default()
     }
 
     // ------------------------------------------------------------ resources
@@ -368,7 +374,9 @@ impl World {
     /// Mutable reference to a resource.
     #[must_use]
     pub fn resource_mut<R: Resource>(&mut self) -> Option<&mut R> {
-        self.resources.get_mut(&TypeId::of::<R>())?.downcast_mut::<R>()
+        self.resources
+            .get_mut(&TypeId::of::<R>())?
+            .downcast_mut::<R>()
     }
 
     /// The resource if present, or the value produced by `default`.
@@ -381,7 +389,9 @@ impl World {
 
     /// Removes and returns a resource.
     pub fn remove_resource<R: Resource>(&mut self) -> Option<R> {
-        self.resources.remove(&TypeId::of::<R>()).and_then(|b| b.downcast::<R>().ok().map(|b| *b))
+        self.resources
+            .remove(&TypeId::of::<R>())
+            .and_then(|b| b.downcast::<R>().ok().map(|b| *b))
     }
 
     /// True when the resource exists.
@@ -394,7 +404,9 @@ impl World {
 
     /// Iterates every entity carrying `A`.
     pub fn for_each<A: Component, F: FnMut(Entity, &A)>(&self, mut f: F) {
-        let Some(sa) = self.storage::<A>() else { return };
+        let Some(sa) = self.storage::<A>() else {
+            return;
+        };
         for (entity, a) in sa.iter() {
             f(entity, a);
         }
@@ -406,7 +418,9 @@ impl World {
     /// no-op system listening for a rare event does not dirty the whole world.
     pub fn for_each_mut<A: Component, F: FnMut(Entity, &mut A)>(&mut self, mut f: F) {
         let tick = self.tick;
-        let Some(sa) = self.storage_mut::<A>() else { return };
+        let Some(sa) = self.storage_mut::<A>() else {
+            return;
+        };
         for (entity, a) in sa.iter_mut() {
             f(entity, a);
         }
@@ -421,7 +435,9 @@ impl World {
 
     /// Iterates entities carrying both `A` and `B`.
     pub fn for_each2<A: Component, B: Component, F: FnMut(Entity, &A, &B)>(&self, mut f: F) {
-        let (Some(sa), Some(sb)) = (self.storage::<A>(), self.storage::<B>()) else { return };
+        let (Some(sa), Some(sb)) = (self.storage::<A>(), self.storage::<B>()) else {
+            return;
+        };
         // Drive the loop from the smaller storage: fewer lookups for the scan.
         if sa.len() <= sb.len() {
             for (entity, a) in sa.iter() {
@@ -448,22 +464,34 @@ impl World {
             None => return,
         };
         let tick = self.tick;
-        let Some((sa, sb)) = self.pair_mut_by_index(ia, ib) else { return };
-        let sa = sa.as_any_mut().downcast_mut::<Storage<A>>().expect("index/A mismatch");
-        let sb = sb.as_any().downcast_ref::<Storage<B>>().expect("index/B mismatch");
+        let Some((sa, sb)) = self.pair_mut_by_index(ia, ib) else {
+            return;
+        };
+        let sa = sa
+            .as_any_mut()
+            .downcast_mut::<Storage<A>>()
+            .expect("index/A mismatch");
+        let sb = sb
+            .as_any()
+            .downcast_ref::<Storage<B>>()
+            .expect("index/B mismatch");
         if sa.len() <= sb.len() {
             let entities: Vec<Entity> = sa.iter_entities().collect();
             for entity in entities {
                 if sb.contains(entity) {
                     let b = sb.get(entity).expect("checked");
-                    let Some(a) = sa.get_mut(entity, tick) else { continue };
+                    let Some(a) = sa.get_mut(entity, tick) else {
+                        continue;
+                    };
                     f(entity, a, b);
                 }
             }
         } else {
             let pairs: Vec<(Entity, &B)> = sb.iter().collect();
             for (entity, b) in pairs {
-                let Some(a) = sa.get_mut(entity, tick) else { continue };
+                let Some(a) = sa.get_mut(entity, tick) else {
+                    continue;
+                };
                 f(entity, a, b);
             }
         }
@@ -479,9 +507,17 @@ impl World {
             None => return,
         };
         let tick = self.tick;
-        let Some((sa, sb)) = self.pair_mut_by_index(ia, ib) else { return };
-        let sa = sa.as_any_mut().downcast_mut::<Storage<A>>().expect("index/A mismatch");
-        let sb = sb.as_any_mut().downcast_mut::<Storage<B>>().expect("index/B mismatch");
+        let Some((sa, sb)) = self.pair_mut_by_index(ia, ib) else {
+            return;
+        };
+        let sa = sa
+            .as_any_mut()
+            .downcast_mut::<Storage<A>>()
+            .expect("index/A mismatch");
+        let sb = sb
+            .as_any_mut()
+            .downcast_mut::<Storage<B>>()
+            .expect("index/B mismatch");
         // Walk whichever storage is smaller, collecting ids first so the
         // lookups do not hold a borrow of the other table.
         let driver: Vec<Entity> = if sa.len() <= sb.len() {
@@ -505,12 +541,19 @@ impl World {
         &self,
         mut f: F,
     ) {
-        let (Some(sa), Some(sb), Some(sc)) =
-            (self.storage::<A>(), self.storage::<B>(), self.storage::<C>())
-        else {
+        let (Some(sa), Some(sb), Some(sc)) = (
+            self.storage::<A>(),
+            self.storage::<B>(),
+            self.storage::<C>(),
+        ) else {
             return;
         };
-        let driver = [sa.len(), sb.len(), sc.len()].iter().enumerate().min_by_key(|x| *x.1).map(|x| x.0).unwrap_or(0);
+        let driver = [sa.len(), sb.len(), sc.len()]
+            .iter()
+            .enumerate()
+            .min_by_key(|x| *x.1)
+            .map(|x| x.0)
+            .unwrap_or(0);
         match driver {
             0 => {
                 for (e, a) in sa.iter() {
@@ -537,20 +580,42 @@ impl World {
     }
 
     /// Iterates entities carrying all three, with `A` mutable.
-    pub fn for_each3_mut<A: Component, B: Component, C: Component, F: FnMut(Entity, &mut A, &B, &C)>(
+    pub fn for_each3_mut<
+        A: Component,
+        B: Component,
+        C: Component,
+        F: FnMut(Entity, &mut A, &B, &C),
+    >(
         &mut self,
         mut f: F,
     ) {
         let tick = self.tick;
-        let Some([sa, sb, sc]) = self.three_by_type::<A, B, C>() else { return };
-        let sa = sa.as_any_mut().downcast_mut::<Storage<A>>().expect("A mismatch");
-        let sb = sb.as_any().downcast_ref::<Storage<B>>().expect("B mismatch");
-        let sc = sc.as_any().downcast_ref::<Storage<C>>().expect("C mismatch");
-        let driver: Vec<Entity> =
-            sa.iter_entities().filter(|e| sb.contains(*e) && sc.contains(*e)).collect();
+        let Some([sa, sb, sc]) = self.three_by_type::<A, B, C>() else {
+            return;
+        };
+        let sa = sa
+            .as_any_mut()
+            .downcast_mut::<Storage<A>>()
+            .expect("A mismatch");
+        let sb = sb
+            .as_any()
+            .downcast_ref::<Storage<B>>()
+            .expect("B mismatch");
+        let sc = sc
+            .as_any()
+            .downcast_ref::<Storage<C>>()
+            .expect("C mismatch");
+        let driver: Vec<Entity> = sa
+            .iter_entities()
+            .filter(|e| sb.contains(*e) && sc.contains(*e))
+            .collect();
         for entity in driver {
-            let (Some(b), Some(c)) = (sb.get(entity), sc.get(entity)) else { continue };
-            let Some(a) = sa.get_mut(entity, tick) else { continue };
+            let (Some(b), Some(c)) = (sb.get(entity), sc.get(entity)) else {
+                continue;
+            };
+            let Some(a) = sa.get_mut(entity, tick) else {
+                continue;
+            };
             f(entity, a, b, c);
         }
     }
@@ -566,16 +631,31 @@ impl World {
         mut f: F,
     ) {
         let tick = self.tick;
-        let Some([sa, sb, sc]) = self.three_by_type::<A, B, C>() else { return };
-        let sa = sa.as_any_mut().downcast_mut::<Storage<A>>().expect("A mismatch");
-        let sb = sb.as_any_mut().downcast_mut::<Storage<B>>().expect("B mismatch");
-        let sc = sc.as_any_mut().downcast_mut::<Storage<C>>().expect("C mismatch");
+        let Some([sa, sb, sc]) = self.three_by_type::<A, B, C>() else {
+            return;
+        };
+        let sa = sa
+            .as_any_mut()
+            .downcast_mut::<Storage<A>>()
+            .expect("A mismatch");
+        let sb = sb
+            .as_any_mut()
+            .downcast_mut::<Storage<B>>()
+            .expect("B mismatch");
+        let sc = sc
+            .as_any_mut()
+            .downcast_mut::<Storage<C>>()
+            .expect("C mismatch");
         let driver: Vec<Entity> = sa
             .iter_entities()
             .filter(|e| sb.contains(*e) && sc.contains(*e))
             .collect();
         for entity in driver {
-            let (a, b, c) = (sa.get_mut(entity, tick), sb.get_mut(entity, tick), sc.get_mut(entity, tick));
+            let (a, b, c) = (
+                sa.get_mut(entity, tick),
+                sb.get_mut(entity, tick),
+                sc.get_mut(entity, tick),
+            );
             if let (Some(a), Some(b), Some(c)) = (a, b, c) {
                 f(entity, a, b, c);
             }
@@ -584,7 +664,9 @@ impl World {
 
     /// Iterates entities whose `A` changed at or after `since`.
     pub fn for_each_changed<A: Component, F: FnMut(Entity, &A)>(&self, since: u32, mut f: F) {
-        let Some(sa) = self.storage::<A>() else { return };
+        let Some(sa) = self.storage::<A>() else {
+            return;
+        };
         for (entity, a) in sa.iter() {
             if sa.changed_at(entity).is_some_and(|t| t >= since) {
                 f(entity, a);
@@ -599,7 +681,9 @@ impl World {
         mut f: F,
     ) {
         let tick = self.tick;
-        let Some(sa) = self.storage_mut::<A>() else { return };
+        let Some(sa) = self.storage_mut::<A>() else {
+            return;
+        };
         let targets: Vec<Entity> = sa
             .iter()
             .filter(|(e, _)| sa.changed_at(*e).is_some_and(|t| t >= since))
@@ -696,9 +780,12 @@ impl World {
     #[must_use]
     pub fn stats(&self) -> WorldStats {
         let component_count: usize = self.storages.iter().map(|s| s.storage_len()).sum();
-        let memory_bytes: usize =
-            self.storages.iter().map(|s| s.storage_memory_bytes()).sum::<usize>()
-                + self.entities.capacity() * core::mem::size_of::<EntityMeta>();
+        let memory_bytes: usize = self
+            .storages
+            .iter()
+            .map(|s| s.storage_memory_bytes())
+            .sum::<usize>()
+            + self.entities.capacity() * core::mem::size_of::<EntityMeta>();
         WorldStats {
             entity_count: self.entities.len(),
             entity_capacity: self.entities.capacity(),
@@ -765,7 +852,11 @@ mod tests {
         assert_eq!(a.index(), b.index(), "slot should be recycled");
         assert_ne!(a, b);
         assert!(!w.is_alive(a));
-        assert_eq!(w.get::<Pos>(a), None, "stale id must not see the new entity");
+        assert_eq!(
+            w.get::<Pos>(a),
+            None,
+            "stale id must not see the new entity"
+        );
         w.insert(b, Pos(2));
         assert_eq!(w.get::<Pos>(b), Some(&Pos(2)));
     }
@@ -962,7 +1053,10 @@ mod tests {
             v.0 += 2;
             h.0 -= 1;
         });
-        assert_eq!(w.get::<Health>(w.entities().next().unwrap()), Some(&Health(9)));
+        assert_eq!(
+            w.get::<Health>(w.entities().next().unwrap()),
+            Some(&Health(9))
+        );
         let mut total = 0;
         w.for_each::<Pos, _>(|_e, p| total += p.0);
         assert_eq!(total, 3 + 3); // 0+1+2 + 1 each
@@ -1072,7 +1166,10 @@ mod tests {
         w.clear();
         assert!(w.is_empty());
         assert_eq!(w.count_with::<Pos>(), 0);
-        assert!(w.storage::<Pos>().is_some(), "the storage type stays registered");
+        assert!(
+            w.storage::<Pos>().is_some(),
+            "the storage type stays registered"
+        );
         assert_eq!(w.stats().component_type_count, 1);
     }
 

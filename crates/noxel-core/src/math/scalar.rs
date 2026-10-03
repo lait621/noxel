@@ -66,7 +66,11 @@ pub fn angle_delta(from: f32, to: f32) -> f32 {
 #[must_use]
 pub fn rotate_towards(current: f32, target: f32, max_step: f32) -> f32 {
     let d = angle_delta(current, target);
-    if d.abs() <= max_step { target } else { wrap_angle(current + max_step * d.signum()) }
+    if d.abs() <= max_step {
+        target
+    } else {
+        wrap_angle(current + max_step * d.signum())
+    }
 }
 
 /// Linear interpolation.
@@ -87,7 +91,11 @@ pub fn lerp_clamped(a: f32, b: f32, t: f32) -> f32 {
 #[inline]
 #[must_use]
 pub fn inv_lerp(a: f32, b: f32, v: f32) -> f32 {
-    if (b - a).abs() < f32::MIN_POSITIVE { 0.0 } else { (v - a) / (b - a) }
+    if (b - a).abs() < f32::MIN_POSITIVE {
+        0.0
+    } else {
+        (v - a) / (b - a)
+    }
 }
 
 /// Smooth step between two edges.
@@ -145,7 +153,11 @@ pub fn damp(current: f32, target: f32, smoothing: f32, dt: f32) -> f32 {
 #[inline]
 #[must_use]
 pub fn clamp_safe(v: f32, min: f32, max: f32) -> f32 {
-    if min > max { (min + max) * 0.5 } else { v.clamp(min, max) }
+    if min > max {
+        (min + max) * 0.5
+    } else {
+        v.clamp(min, max)
+    }
 }
 
 /// Integer floor division that rounds towards negative infinity, unlike `/`.
@@ -153,7 +165,11 @@ pub fn clamp_safe(v: f32, min: f32, max: f32) -> f32 {
 #[must_use]
 pub const fn div_floor(a: i32, b: i32) -> i32 {
     let q = a / b;
-    if (a % b != 0) && ((a < 0) != (b < 0)) { q - 1 } else { q }
+    if (a % b != 0) && ((a < 0) != (b < 0)) {
+        q - 1
+    } else {
+        q
+    }
 }
 
 /// A positive integer modulus that wraps negative inputs correctly.
@@ -168,14 +184,22 @@ pub const fn rem_euclid_i32(a: i32, b: i32) -> i32 {
 #[inline]
 #[must_use]
 pub fn linear_to_srgb(c: f32) -> f32 {
-    if c <= 0.003_130_8 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
+    if c <= 0.003_130_8 {
+        12.92 * c
+    } else {
+        1.055 * c.powf(1.0 / 2.4) - 0.055
+    }
 }
 
 /// Converts an sRGB colour component to linear space.
 #[inline]
 #[must_use]
 pub fn srgb_to_linear(c: f32) -> f32 {
-    if c <= 0.040_45 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    if c <= 0.040_45 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
 }
 
 /// Reinhard tone mapping for a single channel.

@@ -37,10 +37,20 @@ impl Default for Quat {
 
 impl Quat {
     /// The identity rotation.
-    pub const IDENTITY: Self = Self { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+    pub const IDENTITY: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 1.0,
+    };
 
     /// Zero quaternion; not a valid rotation, useful as an accumulator init.
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 0.0,
+    };
 
     /// Constructs a quaternion from components.
     #[inline]
@@ -210,7 +220,12 @@ impl Quat {
             None
         } else {
             let inv = 1.0 / len_sq;
-            Some(Self::new(-self.x * inv, -self.y * inv, -self.z * inv, self.w * inv))
+            Some(Self::new(
+                -self.x * inv,
+                -self.y * inv,
+                -self.z * inv,
+                self.w * inv,
+            ))
         }
     }
 
@@ -450,7 +465,11 @@ mod tests {
         for i in -6..=6 {
             let yaw = i as f32 * 0.5;
             let q = Quat::from_euler(yaw, 0.0, 0.0);
-            assert!(angle_delta(yaw, q.to_yaw()).abs() < 1e-3, "{yaw} -> {}", q.to_yaw());
+            assert!(
+                angle_delta(yaw, q.to_yaw()).abs() < 1e-3,
+                "{yaw} -> {}",
+                q.to_yaw()
+            );
         }
     }
 

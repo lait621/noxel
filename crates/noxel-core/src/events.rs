@@ -115,7 +115,10 @@ impl<E> EventBus<E> {
     /// Prefer [`EventBus::take_into`] when the handler also emits.
     #[must_use]
     pub fn reader(&self) -> EventReader<'_, E> {
-        EventReader { slice: &self.current, index: 0 }
+        EventReader {
+            slice: &self.current,
+            index: 0,
+        }
     }
 
     /// This frame's events, by reference.
@@ -273,7 +276,11 @@ impl<E> EventLog<E> {
     /// Creates a log holding the last `capacity` events.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { events: Vec::new(), capacity: capacity.max(1), next_index: 0 }
+        Self {
+            events: Vec::new(),
+            capacity: capacity.max(1),
+            next_index: 0,
+        }
     }
 
     /// Records an event, evicting the oldest when full.

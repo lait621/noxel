@@ -154,7 +154,11 @@ impl GameClock {
     ///
     /// Call once per frame, before the `while clock.step()` loop.
     pub fn begin_frame(&mut self, real_delta: f32) {
-        let dt = if real_delta.is_finite() { real_delta.clamp(0.0, self.max_frame_delta) } else { 0.0 };
+        let dt = if real_delta.is_finite() {
+            real_delta.clamp(0.0, self.max_frame_delta)
+        } else {
+            0.0
+        };
         if !self.paused {
             self.accumulator += dt * self.time_scale;
         }
@@ -204,7 +208,11 @@ impl GameClock {
     }
 
     fn update_alpha(&mut self) {
-        self.alpha = if self.fixed_dt > 0.0 { (self.accumulator / self.fixed_dt).clamp(0.0, 1.0) } else { 0.0 };
+        self.alpha = if self.fixed_dt > 0.0 {
+            (self.accumulator / self.fixed_dt).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
     }
 
     /// Resets the clock to its initial state, keeping the configuration.
@@ -384,7 +392,9 @@ impl Stopwatch {
     /// Starts a stopwatch now.
     #[must_use]
     pub fn start() -> Self {
-        Self { start: Instant::now() }
+        Self {
+            start: Instant::now(),
+        }
     }
 
     /// Seconds since the stopwatch started.
@@ -427,7 +437,11 @@ impl ScopeSample {
     /// Mean cost per call in milliseconds.
     #[must_use]
     pub fn mean_ms(&self) -> f32 {
-        if self.calls == 0 { 0.0 } else { self.ms / self.calls as f32 }
+        if self.calls == 0 {
+            0.0
+        } else {
+            self.ms / self.calls as f32
+        }
     }
 }
 
@@ -520,7 +534,10 @@ impl Profiler {
     /// remove all overhead.
     #[must_use]
     pub fn disabled() -> Self {
-        Self { enabled: false, ..Self::new() }
+        Self {
+            enabled: false,
+            ..Self::new()
+        }
     }
 
     /// True when the profiler is recording.
@@ -572,7 +589,11 @@ impl Profiler {
             .filter(|s| s.depth == 0)
             .map(|s| s.ms)
             .sum();
-        self.last = FrameProfile { frame: self.frame, total_ms, scopes: self.current.clone() };
+        self.last = FrameProfile {
+            frame: self.frame,
+            total_ms,
+            scopes: self.current.clone(),
+        };
         self.frame += 1;
     }
 
@@ -586,10 +607,20 @@ impl Profiler {
         let parent = self.open.last().map_or(u32::MAX, |(i, _)| *i);
         // Reuse an existing sample with the same name+depth so repeated calls in
         // one frame accumulate instead of allocating a row per call.
-        let idx = match self.current.iter().position(|s| s.name == name && s.depth == depth) {
+        let idx = match self
+            .current
+            .iter()
+            .position(|s| s.name == name && s.depth == depth)
+        {
             Some(i) => i as u32,
             None => {
-                self.current.push(ScopeSample { name, ms: 0.0, calls: 0, depth, parent });
+                self.current.push(ScopeSample {
+                    name,
+                    ms: 0.0,
+                    calls: 0,
+                    depth,
+                    parent,
+                });
                 (self.current.len() - 1) as u32
             }
         };
