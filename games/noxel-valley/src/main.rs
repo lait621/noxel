@@ -547,6 +547,37 @@ impl Valley {
         }
     }
 
+    /// Plants one row per crop, each spread across the growth stages.
+    ///
+    /// A development affordance, and an honest one: the crop atlas has thirty
+    /// sprites and no way to see them in the game until a season has passed.
+    /// This is also how the crop art was checked while it was being drawn.
+    fn plant_demo_field(&mut self) {
+        // Iterating the `const` directly, rather than through a local binding:
+        // the constant is promoted to `'static`, where a `let` would drop it at
+        // the end of the statement and the borrow with it.
+        for (row, crop) in config::CROPS.iter().enumerate() {
+            for stage in 0..5u32 {
+                // In the open field, which the scatter never plants on because
+                // it only places props on grass.
+                let x = 21 + (stage as i32 * 2);
+                let y = 17 + row as i32;
+                let Some(tile) = self.map.get_mut(x, y) else {
+                    continue;
+                };
+                tile.ground = world::Ground::Tilled;
+                tile.watered = stage % 2 == 0;
+                let mut plant = world::Plant::new(crop);
+                plant.days = stage * crop.growth_days / 4;
+                plant.watered = tile.watered;
+                tile.plant = Some(plant);
+            }
+        }
+        // And stand the player where the camera will frame it, so `--demo` shows
+        // the thirty crop sprites rather than a patch of field off-screen.
+        self.player = Player::at((24, 19));
+    }
+
     /// A one-line status for the window title and the log.
     fn status(&self) -> String {
         format!(
@@ -789,6 +820,9 @@ struct Args {
     /// Open this screen on the first frame, for screenshots and for the
     /// documentation's figures.
     screen: Option<Screen>,
+    /// Plant a demonstration field, so the crop art can be seen without playing
+    /// a season first.
+    demo: bool,
     help: bool,
 }
 
@@ -803,6 +837,7 @@ impl Default for Args {
             dump: None,
             assets: None,
             screen: None,
+            demo: false,
             help: false,
         }
     }
@@ -825,6 +860,7 @@ OPTIONS:
     --dump DIR     Write each frame as a PNG into DIR.
     --assets DIR   Asset root. Found automatically by default.
     --screen NAME  Open a screen at startup: inventory, shop, bin, summary.
+    --demo         Plant a demonstration field at several growth stages.
     -h, --help     Print this text.
 
 CONTROLS:
@@ -880,6 +916,7 @@ impl Args {
                     let value = args.next().ok_or("--assets needs a directory")?;
                     parsed.assets = Some(value.into());
                 }
+                "--demo" => parsed.demo = true,
                 "--screen" => {
                     let value = args.next().ok_or("--screen needs a name")?;
                     parsed.screen = Some(match value.as_str() {
@@ -966,6 +1003,9 @@ fn run(args: &Args) -> Result<(), String> {
     // regression check on each overlay.
     if let Some(screen) = args.screen {
         valley.borrow_mut().game_ui.screen = screen;
+    }
+    if args.demo {
+        valley.borrow_mut().plant_demo_field();
     }
     app.add_plugin(ValleyPlugin {
         valley: Rc::clone(&valley),
