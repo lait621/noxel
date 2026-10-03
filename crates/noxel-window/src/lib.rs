@@ -102,6 +102,18 @@ pub struct WindowConfig {
     /// menus, because a player expects Escape to back out of a screen and a key
     /// that ends the session instead loses an afternoon to a mis-press.
     pub quit_on_escape: bool,
+    /// The frame rate the host paces itself to, or `None` to run flat out.
+    ///
+    /// A redraw request is free and the window server does not wait for the
+    /// display, so a host that asks for the next frame the moment it finishes
+    /// this one renders at whatever rate the CPU allows — a software renderer
+    /// with nothing on screen still pins a core at 100%, a laptop gets hot, and
+    /// the fan spins up while the player reads a menu. Pacing to a target rate
+    /// costs one `WaitUntil` and takes the idle load to nearly zero.
+    ///
+    /// `None` is the honest choice for a benchmark, which is the one caller that
+    /// wants to know how fast the machine can go.
+    pub target_fps: Option<u32>,
 }
 
 impl Default for WindowConfig {
@@ -114,6 +126,7 @@ impl Default for WindowConfig {
             background: [8, 10, 16],
             exit_after: None,
             quit_on_escape: true,
+            target_fps: Some(60),
         }
     }
 }
@@ -145,6 +158,24 @@ impl WindowConfig {
     pub fn with_exit_after(mut self, seconds: f32) -> Self {
         self.exit_after = Some(seconds.max(0.0));
         self
+    }
+
+    /// Sets the frame rate the host paces itself to.
+    ///
+    /// `None` runs flat out, which is what a benchmark wants and what a player
+    /// does not: see [`WindowConfig::target_fps`].
+    #[must_use]
+    pub fn with_target_fps(mut self, fps: Option<u32>) -> Self {
+        self.target_fps = fps.filter(|fps| *fps > 0);
+        self
+    }
+
+    /// How long one paced frame lasts, or `None` when unpaced.
+    #[must_use]
+    pub fn frame_period(&self) -> Option<std::time::Duration> {
+        self.target_fps
+            .filter(|fps| *fps > 0)
+            .map(|fps| std::time::Duration::from_secs_f64(1.0 / f64::from(fps)))
     }
 
     /// The largest whole-number scale that fits `window`.
@@ -187,6 +218,90 @@ impl WindowConfig {
             scale,
             offset,
         }
+    }
+}
+
+/// Decides when the next paced frame is due.
+///
+/// Split out of the winit host deliberately: the arithmetic here is the
+/// difference between a machine that sleeps between frames and one that pins a
+/// core forever, and it is the part a test can actually reach — there is no
+/// window, event loop or display in this file's tests.
+///
+/// The policy is **period-aligned, not gap-aligned**. After a frame has run, the
+/// next one is due one period after the *previous deadline*, not one period
+/// after the frame finished. If it were the latter, every millisecond the frame
+/// took would be added to the cadence and the frame rate would sag away from the
+/// target. A frame that ran so late that the next deadline has already passed
+/// resynchronises on the present instead, because the alternative is a burst of
+/// back-to-back frames to "catch up", which is exactly the stutter pacing exists
+/// to remove.
+#[derive(Clone, Copy, Debug)]
+pub struct FramePacer {
+    period: Option<std::time::Duration>,
+    next: std::time::Instant,
+}
+
+impl FramePacer {
+    /// A pacer that wants a frame every `period`, or as often as possible when
+    /// `period` is `None`. The first frame is due immediately.
+    #[must_use]
+    pub fn new(period: Option<std::time::Duration>, now: std::time::Instant) -> Self {
+        Self {
+            period: period.filter(|period| !period.is_zero()),
+            next: now,
+        }
+    }
+
+    /// How long to wait before the next frame, or `None` when it is due now.
+    #[must_use]
+    pub fn wait_for(&self, now: std::time::Instant) -> Option<std::time::Duration> {
+        let period = self.period?;
+        let _ = period;
+        if now >= self.next {
+            return None;
+        }
+        Some(self.next - now)
+    }
+
+    /// Records that a frame ran at `now` and schedules the next one.
+    ///
+    /// The deadline stays on the grid the pacer started on: one period after the
+    /// previous deadline, skipping whole periods if the host is behind. A frame
+    /// that took a third of its period therefore does not push the next one a
+    /// third of a period later, and a host that stalled for ten periods resumes
+    /// on the next grid point rather than rendering ten frames back to back.
+    pub fn mark(&mut self, now: std::time::Instant) {
+        let Some(period) = self.period else {
+            return;
+        };
+        let mut next = self.next + period;
+        if next <= now {
+            let behind = now.duration_since(next);
+            let period_nanos = period.as_nanos().max(1);
+            let missed = behind.as_nanos() / period_nanos;
+            let missed = u32::try_from(missed.saturating_add(1)).unwrap_or(u32::MAX);
+            next += period.saturating_mul(missed);
+            // `saturating_mul` can stop short of the present for an absurd
+            // stall; the invariant that matters is "the next frame is in the
+            // future", not "the phase survived it".
+            if next <= now {
+                next = now + period;
+            }
+        }
+        self.next = next;
+    }
+
+    /// The deadline the next frame is due at.
+    #[must_use]
+    pub fn next_deadline(&self) -> std::time::Instant {
+        self.next
+    }
+
+    /// True when nothing is pacing the host.
+    #[must_use]
+    pub fn is_uncapped(&self) -> bool {
+        self.period.is_none()
     }
 }
 
@@ -536,6 +651,7 @@ impl Host for ClearColor {
 #[cfg(test)]
 mod presentation_tests {
     use super::*;
+    use std::time::{Duration, Instant};
 
     /// A 320x180 framebuffer in a 960x540 window: exactly 3x, no letterbox.
     fn exact() -> WindowConfig {
@@ -669,6 +785,116 @@ mod presentation_tests {
         input.press_mouse(9);
         assert!(!input.is_mouse_down(9));
         assert!(!input.was_mouse_pressed(9));
+    }
+
+    // ------------------------------------------------------------ the pacer
+    //
+    // This is the part of the window host that decides whether a machine sleeps
+    // between frames or pins a core. It is testable here precisely because the
+    // window, the event loop and the display are all somewhere else.
+    //
+    // One base instant per test, because `Instant::now()` twice is two different
+    // instants and a cadence test that is 40 nanoseconds out asserts nothing.
+
+    /// The two-hundred-and-forty-hertz-per-second period every pacer here uses.
+    fn period() -> Duration {
+        Duration::from_secs_f64(1.0 / 60.0)
+    }
+
+    fn pacer_60(base: Instant) -> FramePacer {
+        FramePacer::new(Some(period()), base)
+    }
+
+    #[test]
+    fn the_default_window_is_paced() {
+        assert_eq!(WindowConfig::default().target_fps, Some(60));
+        assert_eq!(WindowConfig::default().frame_period(), Some(period()));
+        // A zero rate is not "pace to zero frames a second", it is "do not pace".
+        assert_eq!(
+            WindowConfig::default().with_target_fps(Some(0)).target_fps,
+            None
+        );
+        assert!(
+            WindowConfig::default()
+                .with_target_fps(None)
+                .frame_period()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn the_first_frame_is_due_immediately() {
+        let base = Instant::now();
+        let pacer = pacer_60(base);
+        assert!(
+            pacer.wait_for(base).is_none(),
+            "the window must draw at once"
+        );
+    }
+
+    #[test]
+    fn a_paced_frame_waits_out_its_period() {
+        let base = Instant::now();
+        let mut pacer = pacer_60(base);
+        pacer.mark(base);
+        // 10 ms later there is still a wait to serve...
+        let remaining = pacer.wait_for(base + Duration::from_millis(10));
+        assert!(
+            remaining.is_some_and(|r| r > Duration::from_millis(6)),
+            "{remaining:?}"
+        );
+        // ...and 20 ms later the frame is overdue.
+        assert!(pacer.wait_for(base + Duration::from_millis(20)).is_none());
+    }
+
+    #[test]
+    fn the_cadence_does_not_drift_with_the_work_a_frame_does() {
+        // The bug this guards: scheduling "one period after the frame finished"
+        // adds every millisecond of work to the period, so a 16.7 ms target
+        // becomes 20.7 ms and then 24.7 ms, and the frame rate sags away from
+        // the one that was asked for.
+        let base = Instant::now();
+        let mut pacer = pacer_60(base);
+        let mut deadline = base;
+        let mut now = base;
+        for _ in 0..120 {
+            // The frame finished at `now`; the next one starts on the grid.
+            pacer.mark(now);
+            deadline += period();
+            assert_eq!(pacer.next_deadline(), deadline, "the phase drifted");
+            now = deadline + Duration::from_millis(4);
+        }
+    }
+
+    #[test]
+    fn a_frame_that_missed_several_periods_resynchronises_instead_of_bursting() {
+        let base = Instant::now();
+        let mut pacer = pacer_60(base);
+        pacer.mark(base);
+        // A 200 ms stall — a debugger pause, a slow first chunk.
+        let after_stall = base + Duration::from_millis(200);
+        pacer.mark(after_stall);
+        let deadline = pacer.next_deadline();
+        assert!(
+            deadline > after_stall,
+            "the next frame is in the past: {deadline:?}"
+        );
+        assert!(
+            deadline <= after_stall + period(),
+            "it must resume on the next grid point, not queue {} frames to catch up",
+            (deadline - after_stall).as_secs_f64() / period().as_secs_f64()
+        );
+    }
+
+    #[test]
+    fn an_uncapped_pacer_never_waits() {
+        let base = Instant::now();
+        let mut pacer = FramePacer::new(None, base);
+        assert!(pacer.is_uncapped());
+        for _ in 0..5 {
+            pacer.mark(base);
+            assert!(pacer.wait_for(base).is_none());
+        }
     }
 }
 

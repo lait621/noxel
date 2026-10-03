@@ -13,7 +13,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, NamedKey, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-use crate::{Host, Input, WindowConfig, key};
+use crate::{FramePacer, Host, Input, WindowConfig, key};
 
 use crate::WindowError;
 
@@ -26,10 +26,14 @@ use crate::WindowError;
 /// be created for the window.
 pub fn run<H: Host>(config: WindowConfig, host: H) -> Result<(), WindowError> {
     let event_loop = EventLoop::new().map_err(|e| WindowError::EventLoop(e.to_string()))?;
-    // `Wait`: do nothing until there is an event. The frame loop is driven by
-    // `request_redraw`, which the compositor throttles, so this does not spin.
+    // `Wait`: do nothing until there is an event, and let the pacer below decide
+    // when a frame is due. Without a pacer the host asks for a redraw the moment
+    // the last one finished, which renders as fast as the CPU allows and holds a
+    // core at 100% with nothing happening on screen.
     event_loop.set_control_flow(ControlFlow::Wait);
 
+    let now = Instant::now();
+    let pacer = FramePacer::new(config.frame_period(), now);
     let mut handler = Handler {
         config,
         host,
@@ -37,9 +41,10 @@ pub fn run<H: Host>(config: WindowConfig, host: H) -> Result<(), WindowError> {
         surface: None,
         context: None,
         input: Input::new(),
-        last_frame: Instant::now(),
-        started: Instant::now(),
+        last_frame: now,
+        started: now,
         frames: 0,
+        pacer,
     };
     event_loop
         .run_app(&mut handler)
@@ -56,6 +61,8 @@ struct Handler<H: Host> {
     last_frame: Instant,
     started: Instant,
     frames: u64,
+    /// When the next frame is allowed to run.
+    pacer: FramePacer,
 }
 
 impl<H: Host> ApplicationHandler for Handler<H> {
@@ -99,6 +106,8 @@ impl<H: Host> ApplicationHandler for Handler<H> {
         self.window = Some(window);
         self.last_frame = Instant::now();
         self.started = Instant::now();
+        // The first frame is due as soon as there is a surface to draw it on.
+        self.pacer = FramePacer::new(self.config.frame_period(), self.started);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -210,10 +219,29 @@ impl<H: Host> ApplicationHandler for Handler<H> {
                 return;
             }
         }
-        if let Some(window) = &self.window {
-            window.request_redraw();
-        } else {
+        let Some(window) = &self.window else {
             event_loop.exit();
+            return;
+        };
+        match self.pacer.wait_for(Instant::now()) {
+            // Not due yet: sleep until the deadline instead of asking for a
+            // frame now. This one line is the difference between a game that
+            // idles at a few percent of a core and one that pins it at 100%,
+            // because `request_redraw` does not wait for anything.
+            Some(remaining) => {
+                event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + remaining));
+            }
+            None => {
+                // Due. The deadline is advanced *here*, when the frame is asked
+                // for, rather than when it finishes: a platform that drops the
+                // request — a hidden or minimised window — would otherwise never
+                // finish a frame and the loop would ask again immediately,
+                // forever. Scheduled this way the worst case is one request per
+                // period, and the frame still starts on its grid point.
+                self.pacer.mark(Instant::now());
+                event_loop.set_control_flow(ControlFlow::Wait);
+                window.request_redraw();
+            }
         }
     }
 }
