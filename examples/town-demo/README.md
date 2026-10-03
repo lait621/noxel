@@ -192,12 +192,23 @@ instead of placeholder villagers, and add a UI plugin that draws with
 
 ## Known gaps
 
-- **`cargo test -p town-demo` fails** with two errors in `src/actors.rs`
-  (`Handle::<Instance>::default()`), plus warnings. The binary is unaffected.
-- **The HUD is not drawn.** `hud::draw`, `draw_occluders`, `draw_marker` and
-  `status_line` are implemented and never called from `main.rs`.
-- **`--scripted` does not exist** as a flag, although `main.rs`'s module docs
-  mention it; scripting is the default and there is no switch.
-- **`village.rs::prop_bounds` is unused** (a dead-code warning).
-- `frames/` is a scratch directory: the demo writes a PNG per frame and never
-  cleans up.
+These are deliberate, and each has a reason.
+
+- **The camera is a fixed three-quarter view.** A real game wants a zoom and a
+  rotate control; `TopDownCamera` supports both (`zoom_by`, `set_yaw`), and they
+  are left out so the demo's scripted route stays reproducible frame for frame.
+- **The player follows a scripted circular route.** There is no window, so there
+  is no input stream. `PlayerPlugin::update` already reads WASD when its
+  `scripted` flag is false; flip it once a host is filling `app.input_mut()`.
+- **NPCs are not drawn from the character sheet.** The demo gives each agent a
+  flat-colour billboard; the generated 4-direction walk cycle in
+  `assets/textures/characters.png` is described by `assets/sprites/characters.json`
+  and awaits a sprite-batching renderer, which the engine does not yet have.
+- **`frames/` is a scratch directory.** The demo writes one PNG per frame and
+  clears stale frames on start, but it never prunes the current run. It is
+  `.gitignore`d.
+- **A large `--npcs` value is bounded by physics.** Tier-0 agents near the camera
+  own a capsule; the rest are steered and path-followed. Raising the population
+  past a few thousand moves more of the crowd into the cheaper tiers rather than
+  making the frame slower, which is the intended behaviour but not obvious from
+  the flag name.

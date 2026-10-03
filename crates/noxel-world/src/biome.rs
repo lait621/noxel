@@ -18,7 +18,8 @@
 //!
 //! Tile names in the table are *requests*, not guarantees: a tile set that does
 //! not contain `"marsh"` still generates, because the generator resolves every
-//! name through a documented fallback chain (see [`crate::r#gen::WorldGenerator`]).
+//! name through a documented fallback chain (see
+//! [`WorldGenerator`](crate::WorldGenerator)).
 
 /// Identifies one of the eight biomes.
 ///

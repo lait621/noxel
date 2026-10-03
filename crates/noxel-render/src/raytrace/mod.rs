@@ -4,7 +4,7 @@
 //!
 //! | Mode | Primary visibility | Shadows | Ambient occlusion | Reflections |
 //! |---|---|---|---|---|
-//! | [`ShadingMode::Raster`](crate::ShadingMode::Raster) | raster | shadow map | — | — |
+//! | [`Raster`](crate::ShadingMode::Raster) | raster | shadow map | — | — |
 //! | [`ShadingMode::Hybrid`] | raster | ray-traced | ray-traced | — |
 //! | [`ShadingMode::Raytrace`] | ray-traced | ray-traced | ray-traced | ray-traced |
 //!

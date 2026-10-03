@@ -119,10 +119,15 @@ the first still be seen. `Opaque` and `Cutout` stay in the opaque pass; `Cutout`
 discards below its threshold and treats the rest as opaque, so foliage sorts with
 the world.
 
-**Implemented vs documented:** `AlphaMode::Additive` is documented as *adding*,
-but the raster fragment path composites it source-over like `Blend`, with alpha
-clamped to 1.0. `Framebuffer::add` exists and is used only by the debug tile
-overlay. Do not build a glow on `Additive` without checking this.
+`Additive` genuinely **adds**: the fragment's radiance is multiplied by its alpha
+and summed into the target, rather than composited source-over. That is the whole
+point of the mode — a fireball, a lamp glow or a magic sparkle should *light* what
+is behind it, and compositing source-over would darken the background instead,
+which is exactly backwards. At a 320x180 internal resolution, where an effect is
+the entire pixel, the difference is not subtle.
+
+Because linear radiance is unbounded, additive output can exceed 1.0; the tone
+curve in `Framebuffer::resolve` is what brings it back (see the colour section).
 
 ## The ray tracer
 
@@ -306,7 +311,7 @@ Modifiers: `with_texture`, `with_uv_scale`, `with_alpha_mode`, `with_lit`,
 | `Opaque` | yes | opaque | everything solid |
 | `Cutout { threshold }` | yes | opaque | foliage, fences, grates |
 | `Blend` | no | transparent, sorted | glass, water, a faded roof |
-| `Additive` | no | transparent, sorted | glow — see the mismatch note above |
+| `Additive` | no | transparent, sorted | glow, fire, magic — genuinely adds light |
 
 ## Lights, ambient and fog
 
@@ -374,9 +379,12 @@ blank cell and does not break the line, so call `text_scaled` once per line.
 - **"Nothing is visible in ray-traced mode."** `ray_budget` ran out before the
   pixel loop reached that part of the screen (it walks in row order and stops).
   Raise the budget, or lower `samples_per_pixel`.
-- **"A ray-traced frame is washed out or clipped."** The tone curve:
-  `AppConfig::mode` does not feed `App::resolve()`, so set `config.render.mode`
-  too.
+- **"A ray-traced frame is washed out or clipped."** `App::resolve` derives the
+  tone curve from the mode the frame was rendered with, so this is usually
+  `RenderSettings::exposure` being wrong for the scene rather than the curve
+  being missing. A frame rendered with `ShadingMode::Raytrace` resolves with
+  `ToneMap::Aces`; switching the mode at runtime is enough, no extra
+  configuration is needed.
 - **"Bloom is missing."** `bloom_threshold` and `bloom_intensity` both default to
   0, and a threshold of 0 blooms the whole image rather than the bright parts.
 - **"`Framebuffer::new` panicked."** A zero-sized target is always a bug (usually

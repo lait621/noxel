@@ -14,7 +14,7 @@
 //! | [`image`] | [`image::Image`]: the RGBA pixel buffer and sprite authoring |
 //! | [`texture`] | [`texture::Texture`]: nearest/bilinear/pixel-art sampling, wrap modes, mips |
 //! | [`atlas`] | deterministic shelf packing into a sprite sheet |
-//! | [`format`] | the engine's data formats: tile sets, prefabs, palettes, sprites, manifests |
+//! | [`format`](mod@format) | the engine's data formats: tile sets, prefabs, palettes, sprites, manifests |
 //! | [`db`] | [`db::AssetDb`]: resolution, caching, hot reload, atomic writes |
 //!
 //! ## The pipeline in one example

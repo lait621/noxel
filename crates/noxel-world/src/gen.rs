@@ -1,9 +1,9 @@
 //! World generation: the height field, the biomes, the tiles and the generator
-//! that turns a [`ChunkPos`] into a [`Chunk`].
+//! that turns a [`ChunkPos`](noxel_core::math::ChunkPos) into a [`Chunk`].
 //!
 //! Everything here is a **pure function of `(seed, position)`**. There is no
 //! shared mutable random number generator: each stage draws from its own
-//! addressable [`RngStream`], so chunk `(900, -400)` is byte-identical whether
+//! addressable [`RngStream`](noxel_core::rng::RngStream), so chunk `(900, -400)` is byte-identical whether
 //! it is generated first, last, or on another machine entirely. That property is
 //! what makes the world streamable and the golden-world tests meaningful.
 //!

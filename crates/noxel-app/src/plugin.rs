@@ -3,7 +3,7 @@
 //! A plugin is a struct with a name and up to three hooks. That is deliberately
 //! the whole interface: anything more elaborate ends up as a framework nobody
 //! uses, and a plugin that needs more can keep its own state and borrow
-//! whatever it wants from the [`App`](crate::App) it is handed.
+//! whatever it wants from the `App` it is handed.
 //!
 //! The one non-obvious rule is that **`build` runs before any `update`**, and
 //! plugins are built in registration order; `update` runs in the same order.

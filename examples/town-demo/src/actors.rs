@@ -1,6 +1,6 @@
 //! The player and the crowd.
 //!
-//! The player is a physics capsule moved by [`PhysicsWorld::move_character`],
+//! The player is a physics capsule moved by `PhysicsWorld::move_character`,
 //! which is what gives it step-up over kerbs, a slope limit and sliding along
 //! walls. The crowd is [`NpcSystem`], which owns its own tiering and steering;
 //! this module only mirrors agents into the render scene and hands the physics

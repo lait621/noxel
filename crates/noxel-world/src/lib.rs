@@ -21,7 +21,7 @@
 //! |---|---|
 //! | [`biome`] | [`BiomeId`], [`Biome`], [`BiomeTable`]: the fixed biome table |
 //! | [`chunk`] | [`Chunk`]: tiles, heights, slopes, colliders, props, buildings |
-//! | [`r#gen`] | [`WorldConfig`], [`WorldGenerator`], [`GenStats`]: the generator |
+//! | `gen` (module `r#gen`) | [`WorldConfig`], [`WorldGenerator`], [`GenStats`]: the generator |
 //! | [`road`] | [`RoadSegment`], [`RoadNetwork`]: the macro lattice |
 //! | [`town`] | [`TownPlan`], [`TownStyle`], [`BuildingPlot`], [`BuildingInstance`] |
 //! | [`stream`] | [`WorldStreamer`], [`StreamStats`]: the LRU chunk cache |

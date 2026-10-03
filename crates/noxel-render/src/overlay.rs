@@ -128,7 +128,7 @@ impl Font {
         "};##./.#./.##/.#./##.|",
     );
 
-    /// Builds the font by parsing [`Font::ART`].
+    /// Builds the font by parsing the glyph table in `Font::ART`.
     #[must_use]
     pub fn new() -> Self {
         let mut glyphs = Vec::new();

@@ -1,0 +1,63 @@
+name: CI
+
+# Noxel has no dependencies and no display requirement, so CI is a plain
+# `cargo` run with no containers, no GPU and no system packages. That is a
+# direct consequence of ADR 0002 and ADR 0003.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    name: test and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Build
+        run: cargo build --workspace --all-targets
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Documentation
+        run: cargo doc --workspace --no-deps
+
+      # The assets in examples/town-demo/assets are generated, and the generator
+      # is deterministic. If a change to noxel-gen alters a byte, `verify` fails
+      # here rather than silently diverging from what is committed.
+      - name: Verify generated assets are up to date
+        run: cargo run --release -p noxel-gen -- verify
+
+  demo:
+    name: headless demo frame
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Render a village with no display server
+        run: cargo run --release -p town-demo -- --frames 60 --dump frames
+      - name: Upload the frame
+        uses: actions/upload-artifact@v4
+        with:
+          name: town-demo-frame
+          path: frames/frame_000059.png

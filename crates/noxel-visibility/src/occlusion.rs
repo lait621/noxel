@@ -9,7 +9,7 @@
 //! *Is this object hidden from the camera?* — cast a ray from the camera to the
 //! object's centre. If something solid is in the way, the object can be skipped.
 //!
-//! Both run against the same [`TriangleBvh`]-style structure: a
+//! Both run against the same triangle-BVH-style structure: a
 //! [`noxel_core::spatial::Bvh`] over **merged occluder volumes**, one box per
 //! building or tree rather than one per triangle. That keeps the query cost flat
 //! as the art gets more detailed, which is the whole point — a town of 400

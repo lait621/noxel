@@ -5,7 +5,7 @@ written in Rust with **no third-party dependencies**.
 
 ```text
 $ cargo run -p town-demo                # generate a world, walk a town, write PNG frames
-$ cargo test --workspace                # ~900 tests, a few seconds, no display needed
+$ cargo test --workspace                # 1475 tests, a few seconds, no display needed
 $ cargo run -p noxel-gen -- generate    # regenerate every asset in examples/town-demo/assets
 ```
 
