@@ -834,6 +834,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "noxel-weather"
+version = "0.1.0"
+dependencies = [
+ "noxel-core",
+]
+
+[[package]]
 name = "noxel-window"
 version = "0.1.0"
 dependencies = [

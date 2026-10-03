@@ -174,6 +174,7 @@ design error, not a compile error you can work around.
 | `noxel-npc` | crowd tiers, flow-field and A* pathfinding, steering, daily schedules |
 | `noxel-ui` | bitmap text with per-script fallback, clipped nine-slice drawing, integer layout, widgets |
 | `noxel-audio` | a synthesiser, a procedural composer, and a device stream behind an opt-in feature |
+| `noxel-weather` | kinds, wind, intensity, and world-space precipitation with depth layers and splashes |
 | `noxel-debug` | rolling statistics, section budgets, overlays, headless frame dumping, image diff |
 | `noxel-app` | `App`, `AppContext`, `Plugin`, the fixed-timestep frame loop |
 | `tools/noxel-gen` | the asset generator: textures, atlases, tilesets, prefabs, the palette — and the library a game's own generator builds on |

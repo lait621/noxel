@@ -9,6 +9,7 @@ members = [
     "crates/noxel-visibility",
     "crates/noxel-window",
     "crates/noxel-audio",
+    "crates/noxel-weather",
     "crates/noxel-physics",
     "crates/noxel-world",
     "crates/noxel-npc",
@@ -44,6 +45,7 @@ noxel-npc = { path = "crates/noxel-npc", version = "0.1.0" }
 noxel-debug = { path = "crates/noxel-debug", version = "0.1.0" }
 noxel-ui = { path = "crates/noxel-ui", version = "0.1.0" }
 noxel-audio = { path = "crates/noxel-audio", version = "0.1.0" }
+noxel-weather = { path = "crates/noxel-weather", version = "0.1.0" }
 noxel-app = { path = "crates/noxel-app", version = "0.1.0" }
 noxel-window = { path = "crates/noxel-window", version = "0.1.0", default-features = false }
 
