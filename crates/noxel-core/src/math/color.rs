@@ -321,6 +321,25 @@ impl Color8 {
         Color::from_srgb8(self.r, self.g, self.b, self.a)
     }
 
+    /// Converts to a linear-space [`Color`] through the 8-bit sRGB table.
+    ///
+    /// **Bit-identical** to [`Color8::to_linear`] — the table is built by
+    /// calling the same function — and what a per-pixel caller should use
+    /// instead of it. `to_linear` costs three `powf` calls, and at 480x270 with
+    /// overlapping sprites that was the single largest consumer of CPU in the
+    /// farming game's frame. Sampling a texture yields bytes, and a byte has
+    /// only 256 possible conversions, so there is nothing left to compute.
+    #[inline]
+    #[must_use]
+    pub fn to_linear_tabulated(self) -> Color {
+        Color::rgba(
+            super::scalar::srgb8_to_linear(self.r),
+            super::scalar::srgb8_to_linear(self.g),
+            super::scalar::srgb8_to_linear(self.b),
+            self.a as f32 / 255.0,
+        )
+    }
+
     /// Builds from a linear-space [`Color`], clamping and encoding.
     #[inline]
     #[must_use]
@@ -524,6 +543,22 @@ impl Default for Palette {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tabulated_conversion_is_the_arithmetic_one() {
+        // Not "close to": the table exists to make the per-pixel path cheap
+        // without making it different, because the renderer's goldens compare
+        // bytes.
+        for code in 0..=255u16 {
+            let code = code as u8;
+            let pixel = Color8::new(code, code.wrapping_mul(7), code.wrapping_mul(13), code);
+            assert_eq!(
+                pixel.to_linear_tabulated(),
+                pixel.to_linear(),
+                "code {code} drifted"
+            );
+        }
+    }
 
     #[test]
     fn hex_roundtrip() {

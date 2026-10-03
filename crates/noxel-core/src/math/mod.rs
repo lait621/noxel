@@ -40,9 +40,10 @@ pub use noise::{
 };
 pub use quat::Quat;
 pub use scalar::{
-    EPSILON, RAY_EPSILON, TAU, angle_delta, approx_eq, clamp_safe, damp, damp_factor, div_floor,
-    inv_lerp, lerp, lerp_clamped, linear_to_srgb, rem_euclid_i32, rotate_towards, smootherstep,
-    smoothstep, srgb_to_linear, to_degrees, to_radians, tonemap_aces, tonemap_reinhard, wrap_angle,
+    EPSILON, RAY_EPSILON, SRGB8_TABLE_LEN, TAU, angle_delta, approx_eq, clamp_safe, damp,
+    damp_factor, div_floor, inv_lerp, lerp, lerp_clamped, linear_to_srgb, rem_euclid_i32,
+    rotate_towards, smootherstep, smoothstep, srgb_to_linear, srgb8_to_linear,
+    srgb8_to_linear_table, to_degrees, to_radians, tonemap_aces, tonemap_reinhard, wrap_angle,
 };
 pub use shapes::{Aabb, Frustum, Plane, Ray, Rect, Sphere, Transform};
 pub use vec::{Vec2, Vec3, Vec4};

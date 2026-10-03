@@ -297,7 +297,9 @@ impl RayTracer {
         let mut alpha = surface.alpha;
         if let Some(tex) = texture {
             let texel = tex.sample_pixel_art(hit.uv.x, hit.uv.y);
-            let linear = texel.to_linear();
+            // Per sample, so through the table; see
+            // `noxel_core::math::srgb8_to_linear_table`.
+            let linear = texel.to_linear_tabulated();
             base = [base[0] * linear.r, base[1] * linear.g, base[2] * linear.b];
             alpha *= texel.a as f32 / 255.0;
         }

@@ -619,7 +619,9 @@ impl Default for Overlay {
 /// The linear RGB of an sRGB colour, which is what the framebuffer stores.
 #[inline]
 fn linear_of(color: Color8) -> [f32; 3] {
-    color.to_linear().to_array3()
+    // Tabulated: the debug overlay draws thousands of texels per panel, all of
+    // them from one atlas. Identical results, no `powf`.
+    color.to_linear_tabulated().to_array3()
 }
 
 #[cfg(test)]

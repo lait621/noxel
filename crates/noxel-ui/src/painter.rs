@@ -23,9 +23,14 @@ use crate::geom::{Insets, UiRect};
 use crate::theme::FrameStyle;
 
 /// The linear RGB of an sRGB colour, which is what the framebuffer stores.
+///
+/// Tabulated rather than computed: `blit` calls this **per texel**, and a glyph
+/// atlas is nothing but texels. Reading the 256-entry table keeps the result
+/// bit-identical (see [`Color8::to_linear_tabulated`]) while removing three
+/// `powf` calls per drawn pixel from every frame of every interface.
 #[inline]
 fn linear_of(color: Color8) -> [f32; 3] {
-    color.to_linear().to_array3()
+    color.to_linear_tabulated().to_array3()
 }
 
 /// The linear colour a texel contributes under a tint.

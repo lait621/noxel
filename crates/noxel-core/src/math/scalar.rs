@@ -207,6 +207,48 @@ pub fn srgb_to_linear(c: f32) -> f32 {
     }
 }
 
+/// How many entries [`srgb8_to_linear_table`] has: every 8-bit code, in order.
+pub const SRGB8_TABLE_LEN: usize = 256;
+
+/// The sRGB-to-linear transfer function, tabulated once for every 8-bit code.
+///
+/// [`srgb_to_linear`] ends in `powf`, and shading one textured fragment needs it
+/// three times. At an internal resolution of 480x270 with a few overlapping
+/// sprites that is hundreds of thousands of `powf` calls per frame — measured at
+/// roughly **a fifth of the whole frame's CPU time** in the farming game before
+/// this table existed. Every texture in this engine stores sRGB bytes, so the
+/// *input* to the conversion is one of exactly 256 values and the output can be
+/// read instead of computed.
+///
+/// The table is built by calling [`srgb_to_linear`] on each code, so a lookup is
+/// **bit-identical** to the arithmetic it replaces rather than an approximation
+/// of it. That matters here: rendering is deterministic and the golden-frame
+/// tests compare bytes (`docs/adr/0008-deterministic-rendering.md`).
+///
+/// Initialised on first use, which costs 256 `powf` calls once per process and
+/// nothing thereafter.
+#[must_use]
+pub fn srgb8_to_linear_table() -> &'static [f32; SRGB8_TABLE_LEN] {
+    static TABLE: std::sync::OnceLock<[f32; SRGB8_TABLE_LEN]> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut table = [0.0_f32; SRGB8_TABLE_LEN];
+        for (code, entry) in table.iter_mut().enumerate() {
+            *entry = srgb_to_linear(code as f32 / 255.0);
+        }
+        table
+    })
+}
+
+/// Converts one 8-bit sRGB code to linear space, through the table.
+///
+/// The hot-loop form of [`srgb_to_linear`]. Give it the byte a texture stores,
+/// never a float that was computed on the way.
+#[inline]
+#[must_use]
+pub fn srgb8_to_linear(code: u8) -> f32 {
+    srgb8_to_linear_table()[code as usize]
+}
+
 /// Reinhard tone mapping for a single channel.
 #[inline]
 #[must_use]
@@ -280,5 +322,27 @@ mod tests {
             let back = srgb_to_linear(linear_to_srgb(c));
             assert!(approx_eq(c, back, 1e-3), "{c} -> {back}");
         }
+    }
+
+    #[test]
+    fn the_srgb8_table_is_the_function_it_replaces() {
+        // Equality, not approximation: the table is what lets the renderer's
+        // inner loop skip `powf` without the golden frames moving.
+        let table = srgb8_to_linear_table();
+        assert_eq!(table.len(), SRGB8_TABLE_LEN);
+        for code in 0..=255u16 {
+            let code = code as u8;
+            assert_eq!(
+                table[code as usize],
+                srgb_to_linear(code as f32 / 255.0),
+                "code {code}"
+            );
+            assert_eq!(srgb8_to_linear(code), table[code as usize]);
+        }
+        // The endpoints are the ones a reader will check by hand.
+        assert_eq!(table[0], 0.0);
+        assert_eq!(table[255], 1.0);
+        // A second call is the same table, not a second table.
+        assert!(core::ptr::eq(table, srgb8_to_linear_table()));
     }
 }

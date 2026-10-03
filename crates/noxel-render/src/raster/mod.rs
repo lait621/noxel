@@ -1080,7 +1080,10 @@ fn shade_fragment(
     let mut alpha = material.alpha;
     if let Some(tex) = texture {
         let texel = tex.sample_pixel_art(uv.x, uv.y);
-        let linear = texel.to_linear();
+        // Once per fragment, so through the table. Three `powf` calls here cost
+        // about a fifth of the whole frame before it existed; see
+        // `noxel_core::math::srgb8_to_linear_table`.
+        let linear = texel.to_linear_tabulated();
         base = [base[0] * linear.r, base[1] * linear.g, base[2] * linear.b];
         alpha *= texel.a as f32 / 255.0;
     }
