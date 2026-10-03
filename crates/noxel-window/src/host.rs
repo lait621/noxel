@@ -159,6 +159,12 @@ impl<H: Host> ApplicationHandler for Handler<H> {
                 self.input.cursor = presentation.cursor_to_framebuffer(next);
                 self.input.cursor_inside = presentation.contains_cursor(next);
             }
+            WindowEvent::CursorEntered { .. } => {
+                self.input.cursor_inside = true;
+            }
+            WindowEvent::CursorLeft { .. } => {
+                self.input.cursor_inside = false;
+            }
             WindowEvent::MouseInput { state, button, .. } => {
                 let slot = match button {
                     MouseButton::Left => 0,

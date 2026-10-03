@@ -195,6 +195,12 @@ impl UiState {
         self.released_last_frame = input.primary_released;
         self.hot = Id::NONE;
         self.pointer_over_ui = false;
+        // `modal` is a claim about *this* frame, like `pointer_over_ui`, and a
+        // claim that survives its frame is a trap: a screen that raised the flag
+        // without lowering it would leave every widget in the game unhoverable
+        // forever, with nothing to point at. It is re-raised by whoever wants it
+        // at the top of the frame they want it in.
+        self.modal = false;
         self.consumed_click = false;
         self.tooltips.clear();
         self.scroll_used = 0.0;
@@ -572,6 +578,24 @@ mod tests {
         let input = UiInputBuilder::new().at(5.0, 5.0).release().build();
         let response = state.interact(id, RECT, &input);
         assert!(response.clicked);
+    }
+
+    #[test]
+    fn the_modal_flag_does_not_survive_its_own_frame() {
+        // It is a claim about *this* frame. A claim that survives is a trap: a
+        // screen that raised it and never lowered it left every widget in the
+        // game unhoverable, permanently, with nothing to point at. That is
+        // exactly what happened — five screens drew a scrim and none of them
+        // lifted it, so once the shop had been opened the whole interface was
+        // dead.
+        let mut state = UiState::default();
+        state.set_modal(true);
+        assert!(state.is_modal());
+        state.begin_frame(1.0 / 60.0, &UiInput::new());
+        assert!(
+            !state.is_modal(),
+            "the modal flag outlived the frame that set it"
+        );
     }
 
     #[test]

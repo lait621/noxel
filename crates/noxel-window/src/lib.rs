@@ -307,7 +307,13 @@ impl Default for Input {
             cursor: (0.0, 0.0),
             // A cursor that reports "outside" by default would make a headless
             // run hover nothing, which is the safe direction to be wrong in.
-            cursor_inside: false,
+            // A window you just opened is one you are looking at, so the cursor
+            // counts as inside until something says otherwise. Defaulting to
+            // `false` meant a click before the first mouse *move* was silently
+            // dropped — the interface could not place the pointer and refused to
+            // hover anything, which looks exactly like a button that does not
+            // work.
+            cursor_inside: true,
             shift: false,
             control: false,
             alt: false,
@@ -677,6 +683,16 @@ mod tests {
         assert!(config.pixel_perfect);
         assert!(config.exit_after.is_none());
         assert!(!config.title.is_empty());
+    }
+
+    #[test]
+    fn a_fresh_window_counts_the_cursor_as_inside() {
+        // A window you just opened is one you are looking at. Defaulting to
+        // `false` meant the first click before any mouse *movement* was
+        // dropped, because the interface could not place the pointer and so
+        // refused to hover anything — which is indistinguishable, from the
+        // outside, from a button that does not work.
+        assert!(Input::default().cursor_inside);
     }
 
     #[test]
