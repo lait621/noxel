@@ -91,8 +91,6 @@ struct Hit {
     uv: Vec2,
     t: f32,
     material: u32,
-    instance: u32,
-    back_face: bool,
 }
 
 /// The ray tracer.
@@ -158,9 +156,7 @@ impl RayTracer {
     /// Discards the temporal accumulation history, for example after a cut.
     pub fn reset_accumulation(&mut self) {
         self.frames_accumulated = 0;
-        for v in &mut self.accumulation {
-            *v = 0.0;
-        }
+        self.accumulation.fill(0.0);
     }
 
     /// Rebuilds the triangle list and BVH when the scene changed.
@@ -250,14 +246,13 @@ impl RayTracer {
             // Two-sided shading: flip the normal so the surface still lights.
             normal = -normal;
         }
+        let _ = back_face;
         Some(Hit {
             position,
             normal,
             uv: tri.uv_at(u, v),
             t,
             material: tri.material,
-            instance: tri.instance,
-            back_face,
         })
     }
 
@@ -559,8 +554,8 @@ impl RayTracer {
                     } else {
                         1.0 - settings.temporal_blend.clamp(0.0, 0.999)
                     };
-                    for c in 0..3 {
-                        self.accumulation[i + c] += (color[c] - self.accumulation[i + c]) * k;
+                    for (slot, value) in self.accumulation[i..i + 3].iter_mut().zip(color.iter()) {
+                        *slot += (value - *slot) * k;
                     }
                     target.set(
                         x,
@@ -572,9 +567,7 @@ impl RayTracer {
                         ],
                     );
                 } else {
-                    for c in 0..3 {
-                        self.accumulation[i + c] = color[c];
-                    }
+                    self.accumulation[i..i + 3].copy_from_slice(&color);
                     target.set(x, y, color);
                 }
                 // Depth is approximated from the primary hit distance so the
@@ -862,7 +855,7 @@ fn reconstruct_normal(
 }
 
 /// The texture a material points at, if any.
-fn material_texture<'a>(scene: &'a Scene, handle: MaterialHandle) -> Option<&'a Texture> {
+fn material_texture(scene: &Scene, handle: MaterialHandle) -> Option<&Texture> {
     let material = scene.material(handle)?;
     scene.texture(material.texture?)
 }

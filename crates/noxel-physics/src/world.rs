@@ -158,7 +158,11 @@ impl PhysicsWorld {
 
     /// Sets world gravity.
     pub fn set_gravity(&mut self, gravity: Vec3) {
-        self.config.gravity = if gravity.is_finite() { gravity } else { Vec3::ZERO };
+        self.config.gravity = if gravity.is_finite() {
+            gravity
+        } else {
+            Vec3::ZERO
+        };
     }
 
     /// World gravity.
@@ -211,8 +215,10 @@ impl PhysicsWorld {
         }
         self.last_finite.remove(&handle);
         self.character_ground.remove(&handle);
-        self.solid_pairs.retain(|&(a, b)| a != handle && b != handle);
-        self.trigger_pairs.retain(|&(a, b)| a != handle && b != handle);
+        self.solid_pairs
+            .retain(|&(a, b)| a != handle && b != handle);
+        self.trigger_pairs
+            .retain(|&(a, b)| a != handle && b != handle);
         self.contacts.retain(|c| c.a != handle && c.b != handle);
         true
     }
@@ -282,7 +288,9 @@ impl PhysicsWorld {
         if !position.is_finite() {
             return false;
         }
-        let Some(body) = self.bodies.get(handle) else { return false };
+        let Some(body) = self.bodies.get(handle) else {
+            return false;
+        };
         if body.position == position {
             self.wake_body(handle);
             return true;
@@ -302,7 +310,9 @@ impl PhysicsWorld {
         if !rotation.is_finite() {
             return false;
         }
-        let Some(body) = self.bodies.get(handle) else { return false };
+        let Some(body) = self.bodies.get(handle) else {
+            return false;
+        };
         let rotation = rotation.normalize();
         if body.rotation == rotation {
             self.wake_body(handle);
@@ -341,7 +351,9 @@ impl PhysicsWorld {
         if !delta.is_finite() {
             return false;
         }
-        let Some(body) = self.bodies.get(handle) else { return false };
+        let Some(body) = self.bodies.get(handle) else {
+            return false;
+        };
         if body.is_static() {
             return false;
         }
@@ -366,7 +378,11 @@ impl PhysicsWorld {
         self.build_contacts();
         self.solve_velocities();
         self.integrate_positions(dt);
-        self.solver.correct_positions(&mut self.bodies, &self.contacts, self.config.position_correction);
+        self.solver.correct_positions(
+            &mut self.bodies,
+            &self.contacts,
+            self.config.position_correction,
+        );
         self.wake_on_contact();
         self.update_sleeping(dt);
         self.emit_events();
@@ -424,7 +440,11 @@ impl PhysicsWorld {
     // -- internals ---------------------------------------------------------
 
     fn clamp_dt(&self, dt: f32) -> f32 {
-        if !dt.is_finite() || dt <= 0.0 { 0.0 } else { dt.min(self.config.max_step_delta) }
+        if !dt.is_finite() || dt <= 0.0 {
+            0.0
+        } else {
+            dt.min(self.config.max_step_delta)
+        }
     }
 
     /// Clears the sleep flag and records a `BodyWoke` event when it was set.
@@ -456,7 +476,9 @@ impl PhysicsWorld {
 
     /// Re-registers one body's bounds in the hash.
     pub(crate) fn sync_entry(&mut self, handle: BodyHandle) {
-        let Some(body) = self.bodies.get(handle) else { return };
+        let Some(body) = self.bodies.get(handle) else {
+            return;
+        };
         let bounds = finite_bounds(body.aabb());
         match self.entries.get(&handle).copied() {
             Some(entry) => {
@@ -486,11 +508,17 @@ impl PhysicsWorld {
         self.hash.query_aabb(bounds, &mut entries);
         out.clear();
         for entry in entries {
-            let Some(&handle) = self.hash.get(entry) else { continue };
+            let Some(&handle) = self.hash.get(entry) else {
+                continue;
+            };
             if filter.ignore == Some(handle) {
                 continue;
             }
-            if self.bodies.get(handle).is_some_and(|body| filter.accepts(body)) {
+            if self
+                .bodies
+                .get(handle)
+                .is_some_and(|body| filter.accepts(body))
+            {
                 out.push(handle);
             }
         }
@@ -551,7 +579,11 @@ impl PhysicsWorld {
                 }
                 // Canonical order: the lower handle is always `a`, so both the
                 // pair set and the contact list are stable.
-                let (a, b) = if raw_a < raw_b { (raw_a, raw_b) } else { (raw_b, raw_a) };
+                let (a, b) = if raw_a < raw_b {
+                    (raw_a, raw_b)
+                } else {
+                    (raw_b, raw_a)
+                };
                 let (Some(body_a), Some(body_b)) = (bodies.get(a), bodies.get(b)) else {
                     return;
                 };
@@ -588,7 +620,8 @@ impl PhysicsWorld {
     fn solve_velocities(&mut self) {
         let iterations = self.config.solver_iterations;
         self.stats.solver_iterations = iterations;
-        self.solver.solve_velocities(&mut self.bodies, &self.contacts, iterations);
+        self.solver
+            .solve_velocities(&mut self.bodies, &self.contacts, iterations);
     }
 
     /// Wakes sleeping bodies that an awake neighbour reached or pushed.
@@ -707,7 +740,10 @@ impl PhysicsWorld {
         }
         for &pair in &self.solid_pairs {
             if !solid.contains_key(&pair) {
-                self.events.push(PhysicsEvent::CollisionExit { a: pair.0, b: pair.1 });
+                self.events.push(PhysicsEvent::CollisionExit {
+                    a: pair.0,
+                    b: pair.1,
+                });
             }
         }
         self.solid_pairs = solid.into_keys().collect();
@@ -716,13 +752,18 @@ impl PhysicsWorld {
             if !self.trigger_pairs.contains(&pair) {
                 // Reuse the contact point as the trigger's observation point.
                 let _ = index;
-                self.events
-                    .push(PhysicsEvent::TriggerEnter { trigger: pair.0, other: pair.1 });
+                self.events.push(PhysicsEvent::TriggerEnter {
+                    trigger: pair.0,
+                    other: pair.1,
+                });
             }
         }
         for &pair in &self.trigger_pairs {
             if !triggers.contains_key(&pair) {
-                self.events.push(PhysicsEvent::TriggerExit { trigger: pair.0, other: pair.1 });
+                self.events.push(PhysicsEvent::TriggerExit {
+                    trigger: pair.0,
+                    other: pair.1,
+                });
             }
         }
         self.trigger_pairs = triggers.into_keys().collect();

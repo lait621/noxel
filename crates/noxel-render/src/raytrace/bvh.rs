@@ -249,9 +249,7 @@ impl TriangleBvh {
         let mut best: Option<(u32, f32, f32, f32)> = None;
         let mut stack: Vec<u32> = Vec::with_capacity(64);
         let root = self.nodes[0];
-        let Some((root_t0, root_t1)) = root.bounds.intersect_ray(ray.origin, ray.dir) else {
-            return None;
-        };
+        let (root_t0, root_t1) = root.bounds.intersect_ray(ray.origin, ray.dir)?;
         if root_t1 < 0.0 || root_t0 > ray.max_t {
             return None;
         }

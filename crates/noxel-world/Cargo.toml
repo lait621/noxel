@@ -8,8 +8,9 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+# The world layer depends on exactly two crates: the maths/RNG foundation and the
+# asset formats it reads tile sets and prefabs from. Physics, rendering and NPC
+# code consume `noxel-world`, never the other way round.
 [dependencies]
 noxel-core.workspace = true
-noxel-ecs.workspace = true
 noxel-asset.workspace = true
-noxel-physics.workspace = true

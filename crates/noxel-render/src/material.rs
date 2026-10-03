@@ -333,7 +333,7 @@ mod tests {
     fn alpha_modes_classify() {
         assert!(!AlphaMode::Opaque.is_transparent());
         assert!(AlphaMode::Opaque.writes_depth());
-        assert!(!AlphaMode::Blend.is_transparent() == false);
+        assert!(AlphaMode::Blend.is_transparent());
         assert!(!AlphaMode::Blend.writes_depth());
         assert!(!AlphaMode::Additive.writes_depth());
         assert!(AlphaMode::Cutout { threshold: 0.5 }.writes_depth());
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn builders_set_the_expected_flags() {
-        assert!(Material::lit("m", Color::WHITE).unlit == false);
+        assert!(!Material::lit("m", Color::WHITE).unlit);
         assert!(Material::unlit("m", Color::WHITE).unlit);
         assert!(
             Material::transparent("m", Color::WHITE)

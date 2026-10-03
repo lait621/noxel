@@ -106,13 +106,21 @@ impl Kernel {
 /// may not move.
 #[inline]
 fn movable_inv_mass(body: &Body) -> f32 {
-    if body.is_dynamic() && !body.sleeping { body.inv_mass } else { 0.0 }
+    if body.is_dynamic() && !body.sleeping {
+        body.inv_mass
+    } else {
+        0.0
+    }
 }
 
 /// Inverse yaw moment of inertia a body contributes to the solver.
 #[inline]
 fn movable_inv_inertia(body: &Body) -> f32 {
-    if body.is_dynamic() && !body.sleeping { inverse_yaw_inertia(body) } else { 0.0 }
+    if body.is_dynamic() && !body.sleeping {
+        inverse_yaw_inertia(body)
+    } else {
+        0.0
+    }
 }
 
 /// The yaw moment of inertia of a body's collider.
@@ -185,11 +193,16 @@ impl SolverScratch {
             else {
                 continue;
             };
-            let Some(kernel) = Kernel::new(body_a, body_b, contact) else { continue };
+            let Some(kernel) = Kernel::new(body_a, body_b, contact) else {
+                continue;
+            };
             let vn = kernel.relative_velocity(body_a, body_b).dot(contact.normal);
             let restitution = body_a.restitution.max(body_b.restitution);
-            self.targets[i] =
-                if vn < -RESTITUTION_THRESHOLD { -restitution * vn } else { 0.0 };
+            self.targets[i] = if vn < -RESTITUTION_THRESHOLD {
+                -restitution * vn
+            } else {
+                0.0
+            };
             self.kernels[i] = Some(kernel);
         }
     }
@@ -203,7 +216,9 @@ impl SolverScratch {
     ) {
         for _ in 0..iterations {
             for (i, contact) in contacts.iter().enumerate() {
-                let Some(kernel) = self.kernels.get(i).copied().flatten() else { continue };
+                let Some(kernel) = self.kernels.get(i).copied().flatten() else {
+                    continue;
+                };
                 let Some((body_a, body_b)) = bodies.get_two_mut(contact.a, contact.b) else {
                     continue;
                 };
@@ -247,8 +262,11 @@ impl SolverScratch {
                 }
                 let accumulated = self.friction_impulses[i] + dir * lambda;
                 let length = accumulated.length();
-                let clamped =
-                    if length > bound { accumulated * (bound / length) } else { accumulated };
+                let clamped = if length > bound {
+                    accumulated * (bound / length)
+                } else {
+                    accumulated
+                };
                 let delta = clamped - self.friction_impulses[i];
                 if delta != Vec3::ZERO {
                     self.friction_impulses[i] = clamped;
@@ -307,19 +325,37 @@ mod tests {
     }
 
     fn contact(a: BodyHandle, b: BodyHandle, normal: Vec3, point: Vec3) -> Contact {
-        Contact { a, b, normal, point, penetration: 0.0, is_sensor: false }
+        Contact {
+            a,
+            b,
+            normal,
+            point,
+            penetration: 0.0,
+            is_sensor: false,
+        }
     }
 
     #[test]
     fn yaw_inertia_matches_closed_forms() {
         // 1x1x1 box: I_y = m/12 (1^2 + 1^2) = m/6.
-        let i = yaw_inertia(&ColliderShape::Box { half_extents: Vec3::splat(0.5) }, 1.0);
+        let i = yaw_inertia(
+            &ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            },
+            1.0,
+        );
         assert!((i - 1.0 / 6.0).abs() < 1e-5, "{i}");
         // Solid sphere: 2/5 m r^2.
         let i = yaw_inertia(&ColliderShape::Sphere { radius: 2.0 }, 3.0);
         assert!((i - 0.4 * 3.0 * 4.0).abs() < 1e-5);
         // Cylinder about its axis: 1/2 m r^2.
-        let i = yaw_inertia(&ColliderShape::Cylinder { radius: 0.5, half_height: 2.0 }, 4.0);
+        let i = yaw_inertia(
+            &ColliderShape::Cylinder {
+                radius: 0.5,
+                half_height: 2.0,
+            },
+            4.0,
+        );
         assert!((i - 0.5 * 4.0 * 0.25).abs() < 1e-5);
     }
 
@@ -451,12 +487,16 @@ mod tests {
         let mut bodies = SlotMap::new();
         let a = bodies.insert(body(
             crate::body::BodyKind::Kinematic,
-            ColliderShape::Box { half_extents: Vec3::splat(0.5) },
+            ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            },
             Vec3::ZERO,
         ));
         let b = bodies.insert(body(
             crate::body::BodyKind::Dynamic,
-            ColliderShape::Box { half_extents: Vec3::splat(0.5) },
+            ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            },
             Vec3::new(0.9, 0.0, 0.0),
         ));
         bodies.get_mut(a).unwrap().linear_velocity = Vec3::new(1.0, 0.0, 0.0);
@@ -478,14 +518,18 @@ mod tests {
     fn friction_is_clamped_by_the_friction_cone() {
         let mut bodies = SlotMap::new();
         let a = bodies.insert(
-            BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-                .with_friction(0.5)
-                .build(),
+            BodyDesc::dynamic(ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            })
+            .with_friction(0.5)
+            .build(),
         );
         let b = bodies.insert(
-            BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-                .with_friction(0.5)
-                .build(),
+            BodyDesc::static_body(ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            })
+            .with_friction(0.5)
+            .build(),
         );
         // Sliding fast in +X while resting on a floor whose normal is +Y.
         bodies.get_mut(a).unwrap().linear_velocity = Vec3::new(10.0, -1.0, 0.0);
@@ -497,7 +541,11 @@ mod tests {
         let vx = bodies.get(a).unwrap().linear_velocity.x;
         let dv = 10.0 - vx;
         // Equal masses: the friction impulse is exactly the velocity change.
-        assert!(dv <= 0.5 * jn + 1e-4, "dv {dv} must respect mu * jn = {}", 0.5 * jn);
+        assert!(
+            dv <= 0.5 * jn + 1e-4,
+            "dv {dv} must respect mu * jn = {}",
+            0.5 * jn
+        );
         assert!(vx > 0.0, "one iteration must not reverse the slide");
     }
 
@@ -524,7 +572,9 @@ mod tests {
     fn position_correction_splits_by_inverse_mass() {
         let mut bodies = SlotMap::new();
         let a = bodies.insert(
-            BodyDesc::dynamic(ColliderShape::Sphere { radius: 0.5 }).with_mass(1.0).build(),
+            BodyDesc::dynamic(ColliderShape::Sphere { radius: 0.5 })
+                .with_mass(1.0)
+                .build(),
         );
         let b = bodies.insert(
             BodyDesc::dynamic(ColliderShape::Sphere { radius: 0.5 })

@@ -47,6 +47,9 @@ pub struct HashEntry<T> {
     cells: Vec<(i32, i32)>,
 }
 
+/// An unordered pair of entries, normalised so the lower handle comes first.
+type EntryPair<T> = (Handle<HashEntry<T>>, Handle<HashEntry<T>>);
+
 /// A spatial hash over the XZ plane.
 #[derive(Clone, Debug)]
 pub struct SpatialHash<T> {
@@ -271,7 +274,7 @@ impl<T> SpatialHash<T> {
         &self,
         mut f: impl FnMut(Handle<HashEntry<T>>, Handle<HashEntry<T>>),
     ) {
-        let mut pairs: Vec<(Handle<HashEntry<T>>, Handle<HashEntry<T>>)> = Vec::new();
+        let mut pairs: Vec<EntryPair<T>> = Vec::new();
         for list in self.cells.values() {
             for i in 0..list.len() {
                 for j in (i + 1)..list.len() {

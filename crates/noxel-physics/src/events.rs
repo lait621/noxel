@@ -79,6 +79,12 @@ mod tests {
         let f = e;
         assert_eq!(e, f);
         assert_ne!(e, PhysicsEvent::CollisionExit { a, b });
-        assert_ne!(e, PhysicsEvent::TriggerEnter { trigger: a, other: b });
+        assert_ne!(
+            e,
+            PhysicsEvent::TriggerEnter {
+                trigger: a,
+                other: b
+            }
+        );
     }
 }

@@ -12,6 +12,9 @@
 //!
 //! # Shape pairs
 //!
+//! Colliders are first reduced to a [`Prim`] (box, sphere or capsule), which is
+//! what makes the dispatcher small and total:
+//!
 //! | Pair | Method |
 //! |---|---|
 //! | sphere/sphere | analytic |
@@ -102,9 +105,9 @@ pub(crate) fn contact_between(
         body_b.position,
         body_b.rotation,
     );
-    if !(f.separation <= tolerance) {
-        // Written as a negated comparison so a NaN separation produces no
-        // contact instead of a poisoned one.
+    if !f.separation.is_finite() || f.separation > tolerance {
+        // A non-finite separation means a shape is poisoned: report no contact
+        // rather than a contact that would poison the solver.
         return None;
     }
     let midpoint = (f.point_a + f.point_b) * 0.5;
@@ -112,10 +115,77 @@ pub(crate) fn contact_between(
         a,
         b,
         normal: f.normal,
-        point: if midpoint.is_finite() { midpoint } else { f.point_a },
+        point: if midpoint.is_finite() {
+            midpoint
+        } else {
+            f.point_a
+        },
         penetration: (-f.separation).max(0.0),
         is_sensor: body_a.is_sensor || body_b.is_sensor,
     })
+}
+
+/// A collider reduced to the primitive the narrowphase works with.
+///
+/// Cylinders arrive here already replaced by their bounding box
+/// ([`ColliderShape::collision_shape`]).
+#[derive(Clone, Copy, Debug)]
+enum Prim {
+    /// An oriented box: centre, three orthonormal world axes, half extents.
+    Box {
+        /// Centre of the box.
+        center: Vec3,
+        /// World-space unit axes of the box.
+        axes: [Vec3; 3],
+        /// Half extents along the local axes.
+        half: Vec3,
+    },
+    /// A sphere.
+    Sphere {
+        /// Centre of the sphere.
+        center: Vec3,
+        /// Radius of the sphere.
+        radius: f32,
+    },
+    /// A capsule: the ends of its axis segment, swept by `radius`.
+    Capsule {
+        /// Start of the axis segment.
+        a0: Vec3,
+        /// End of the axis segment.
+        a1: Vec3,
+        /// Radius of the swept sphere.
+        radius: f32,
+    },
+}
+
+/// Places a collider in the world as a [`Prim`].
+#[must_use]
+fn primitive(shape: &ColliderShape, position: Vec3, rotation: Quat) -> Prim {
+    match *shape {
+        ColliderShape::Box { half_extents } => Prim::Box {
+            center: position,
+            axes: box_axes(rotation),
+            half: half_extents.abs(),
+        },
+        ColliderShape::Sphere { radius } => Prim::Sphere {
+            center: position,
+            radius: radius.abs(),
+        },
+        ColliderShape::Capsule {
+            radius,
+            half_height,
+        } => {
+            let (a0, a1) = capsule_axis(position, rotation, half_height.abs());
+            Prim::Capsule {
+                a0,
+                a1,
+                radius: radius.abs(),
+            }
+        }
+        // Unreachable through `collision_shape`, but recursing keeps the match
+        // total instead of panicking.
+        ColliderShape::Cylinder { .. } => primitive(&shape.collision_shape(), position, rotation),
+    }
 }
 
 /// The closest features of two shapes placed in the world.
@@ -130,67 +200,68 @@ pub(crate) fn closest_features(
 ) -> Features {
     // Cylinders collide as their bounding box; every branch below therefore
     // only has to handle boxes, spheres and capsules.
-    let a = shape_a.collision_shape();
-    let b = shape_b.collision_shape();
+    let a = primitive(&shape_a.collision_shape(), pos_a, rot_a);
+    let b = primitive(&shape_b.collision_shape(), pos_b, rot_b);
 
-    if let ColliderShape::Sphere { radius } = a {
-        return sphere_other(pos_a, radius, &b, pos_b, rot_b);
-    }
-    if let ColliderShape::Sphere { radius } = b {
-        return sphere_other(pos_b, radius, &a, pos_a, rot_a).flipped();
-    }
-
-    match (a, b) {
+    match (&a, &b) {
+        (Prim::Sphere { center, radius }, other) => sphere_primitive(*center, *radius, other),
+        (other, Prim::Sphere { center, radius }) => {
+            sphere_primitive(*center, *radius, other).flipped()
+        }
         (
-            ColliderShape::Capsule { radius: ra, half_height: ha },
-            ColliderShape::Capsule { radius: rb, half_height: hb },
-        ) => capsule_capsule(pos_a, rot_a, ra, ha, pos_b, rot_b, rb, hb),
-        (ColliderShape::Capsule { radius, half_height }, _) => {
-            capsule_box(pos_a, rot_a, radius, half_height, pos_b, rot_b, box_half(&b))
+            Prim::Capsule { a0, a1, radius },
+            Prim::Capsule {
+                a0: b0,
+                a1: b1,
+                radius: rb,
+            },
+        ) => capsule_capsule(*a0, *a1, *radius, *b0, *b1, *rb),
+        (Prim::Capsule { a0, a1, radius }, Prim::Box { center, axes, half }) => {
+            capsule_box(*a0, *a1, *radius, *center, axes, *half)
         }
-        (_, ColliderShape::Capsule { radius, half_height }) => {
-            capsule_box(pos_b, rot_b, radius, half_height, pos_a, rot_a, box_half(&a)).flipped()
+        (Prim::Box { center, axes, half }, Prim::Capsule { a0, a1, radius }) => {
+            capsule_box(*a0, *a1, *radius, *center, axes, *half).flipped()
         }
-        _ => box_box(pos_a, rot_a, box_half(&a), pos_b, rot_b, box_half(&b)),
+        (
+            Prim::Box {
+                center: ca,
+                axes: ax,
+                half: ha,
+            },
+            Prim::Box {
+                center: cb,
+                axes: bx,
+                half: hb,
+            },
+        ) => box_box(*ca, ax, *ha, *cb, bx, *hb),
     }
 }
 
-/// Half extents of a shape that has already been reduced to a box.
-#[inline]
-fn box_half(shape: &ColliderShape) -> Vec3 {
-    match *shape {
-        ColliderShape::Box { half_extents } => half_extents.abs(),
-        // Unreachable after `collision_shape`, but a zero box is harmless.
-        _ => Vec3::ZERO,
-    }
-}
-
-/// Sphere against any other shape. The normal points from the sphere to the
+/// Sphere against any other primitive. The normal points from the sphere to the
 /// other shape.
-fn sphere_other(
-    center: Vec3,
-    radius: f32,
-    other: &ColliderShape,
-    other_pos: Vec3,
-    other_rot: Quat,
-) -> Features {
+fn sphere_primitive(center: Vec3, radius: f32, other: &Prim) -> Features {
     match *other {
-        ColliderShape::Sphere { radius: r2 } => sphere_sphere(center, radius, other_pos, r2),
-        ColliderShape::Box { half_extents } => {
-            sphere_box(center, radius, other_pos, other_rot, half_extents)
-        }
-        ColliderShape::Capsule { radius: r2, half_height } => {
-            let (p0, p1) = capsule_axis(other_pos, other_rot, half_height);
-            let closest = closest_point_on_segment(center, p0, p1);
-            sphere_sphere(center, radius, closest, r2)
-        }
-        ColliderShape::Cylinder { .. } => {
-            sphere_other(center, radius, &other.collision_shape(), other_pos, other_rot)
+        Prim::Sphere {
+            center: other_center,
+            radius: other_radius,
+        } => sphere_sphere(center, radius, other_center, other_radius),
+        Prim::Box {
+            center: box_center,
+            axes,
+            half,
+        } => sphere_box(center, radius, box_center, &axes, half),
+        Prim::Capsule {
+            a0,
+            a1,
+            radius: cap_radius,
+        } => {
+            let closest = closest_point_on_segment(center, a0, a1);
+            sphere_sphere(center, radius, closest, cap_radius)
         }
     }
 }
 
-/// The two endpoints of a Y-aligned capsule or cylinder axis.
+/// The two endpoints of a Y-aligned capsule axis.
 #[inline]
 fn capsule_axis(center: Vec3, rotation: Quat, half_height: f32) -> (Vec3, Vec3) {
     let axis = rotation.rotate_vec3(Vec3::Y) * half_height;
@@ -220,12 +291,11 @@ fn sphere_box(
     center: Vec3,
     radius: f32,
     box_center: Vec3,
-    box_rot: Quat,
+    axes: &[Vec3; 3],
     half: Vec3,
 ) -> Features {
     let half = half.abs();
-    let inv = box_rot.conjugate();
-    let local = inv.rotate_vec3(center - box_center);
+    let local = to_local(center - box_center, axes);
     let clamped = local.clamp(-half, half);
     let delta = local - clamped;
     let distance = delta.length();
@@ -235,11 +305,10 @@ fn sphere_box(
         // towards the sphere, so the sphere->box normal is `-delta`.
         let to_sphere = delta / distance;
         let point_a_local = local - to_sphere * radius;
-        let normal = box_rot.rotate_vec3(-to_sphere);
         Features {
-            point_a: box_center + box_rot.rotate_vec3(point_a_local),
-            point_b: box_center + box_rot.rotate_vec3(clamped),
-            normal,
+            point_a: box_center + to_world(point_a_local, axes),
+            point_b: box_center + to_world(clamped, axes),
+            normal: to_world(-to_sphere, axes),
             separation: distance - radius,
         }
     } else {
@@ -258,34 +327,30 @@ fn sphere_box(
         let point_a_local = local + escape * radius;
         let point_b_local = local + escape * depth;
         Features {
-            point_a: box_center + box_rot.rotate_vec3(point_a_local),
-            point_b: box_center + box_rot.rotate_vec3(point_b_local),
-            normal: box_rot.rotate_vec3(-escape),
+            point_a: box_center + to_world(point_a_local, axes),
+            point_b: box_center + to_world(point_b_local, axes),
+            normal: to_world(-escape, axes),
             separation: -(depth + radius),
         }
     }
 }
 
-/// Capsule against capsule.
+/// Capsule against capsule, given each capsule's axis segment.
 fn capsule_capsule(
-    pos_a: Vec3,
-    rot_a: Quat,
+    a0: Vec3,
+    a1: Vec3,
     radius_a: f32,
-    half_a: f32,
-    pos_b: Vec3,
-    rot_b: Quat,
+    b0: Vec3,
+    b1: Vec3,
     radius_b: f32,
-    half_b: f32,
 ) -> Features {
-    let (a0, a1) = capsule_axis(pos_a, rot_a, half_a);
-    let (b0, b1) = capsule_axis(pos_b, rot_b, half_b);
     let (qa, qb) = closest_points_segments(a0, a1, b0, b1);
     let delta = qb - qa;
     let distance = delta.length();
     let normal = if distance > CONTACT_EPSILON {
         delta / distance
     } else {
-        let fallback = pos_b - pos_a;
+        let fallback = (b0 + b1) - (a0 + a1);
         if fallback.length_squared() > CONTACT_EPSILON {
             fallback.normalize_or_zero()
         } else {
@@ -302,19 +367,16 @@ fn capsule_capsule(
 
 /// Capsule against box. The normal points from the capsule to the box.
 fn capsule_box(
-    cap_pos: Vec3,
-    cap_rot: Quat,
+    a0: Vec3,
+    a1: Vec3,
     radius: f32,
-    half_height: f32,
     box_center: Vec3,
-    box_rot: Quat,
+    axes: &[Vec3; 3],
     half: Vec3,
 ) -> Features {
     let half = half.abs();
-    let (e0, e1) = capsule_axis(cap_pos, cap_rot, half_height);
-    let inv = box_rot.conjugate();
-    let l0 = inv.rotate_vec3(e0 - box_center);
-    let l1 = inv.rotate_vec3(e1 - box_center);
+    let l0 = to_local(a0 - box_center, axes);
+    let l1 = to_local(a1 - box_center, axes);
     let (seg_local, box_local) = closest_point_segment_aabb(l0, l1, half);
     let delta = box_local - seg_local;
     let distance = delta.length();
@@ -322,9 +384,9 @@ fn capsule_box(
     if distance > CONTACT_EPSILON {
         let to_box = delta / distance;
         Features {
-            point_a: box_center + box_rot.rotate_vec3(seg_local + to_box * radius),
-            point_b: box_center + box_rot.rotate_vec3(box_local),
-            normal: box_rot.rotate_vec3(to_box),
+            point_a: box_center + to_world(seg_local + to_box * radius, axes),
+            point_b: box_center + to_world(box_local, axes),
+            normal: to_world(to_box, axes),
             separation: distance - radius,
         }
     } else {
@@ -343,9 +405,9 @@ fn capsule_box(
         let mut escape = Vec3::ZERO;
         escape[axis] = if mid[axis] >= 0.0 { 1.0 } else { -1.0 };
         Features {
-            point_a: box_center + box_rot.rotate_vec3(mid + escape * radius),
-            point_b: box_center + box_rot.rotate_vec3(mid + escape * depth),
-            normal: box_rot.rotate_vec3(-escape),
+            point_a: box_center + to_world(mid + escape * radius, axes),
+            point_b: box_center + to_world(mid + escape * depth, axes),
+            normal: to_world(-escape, axes),
             separation: -(depth + radius),
         }
     }
@@ -356,13 +418,22 @@ fn capsule_box(
 ///
 /// Any pitch or roll on the bodies is honoured — the SAT is general — but the
 /// *solver* only exchanges yaw, so boxes cannot topple (see `solver.rs`).
-fn box_box(pos_a: Vec3, rot_a: Quat, half_a: Vec3, pos_b: Vec3, rot_b: Quat, half_b: Vec3) -> Features {
-    let ax = box_axes(rot_a);
-    let bx = box_axes(rot_b);
+fn box_box(
+    pos_a: Vec3,
+    axes_a: &[Vec3; 3],
+    half_a: Vec3,
+    pos_b: Vec3,
+    axes_b: &[Vec3; 3],
+    half_b: Vec3,
+) -> Features {
+    let ax = *axes_a;
+    let bx = *axes_b;
     let half_a = half_a.abs();
     let half_b = half_b.abs();
     let t = pos_b - pos_a;
 
+    // The minimum-overlap axis and, separately, the largest gap found (a lower
+    // bound of the true distance when the boxes are apart).
     let mut min_overlap = f32::INFINITY;
     let mut mtv = Vec3::Y;
     let mut mtv_ref_is_a = true;
@@ -411,13 +482,17 @@ fn box_box(pos_a: Vec3, rot_a: Quat, half_a: Vec3, pos_b: Vec3, rot_b: Quat, hal
     }
 
     if separated {
-        // `max_separation` is the largest gap found along the tested axes, a
-        // lower bound of the true distance. Conservative advancement only
-        // needs a lower bound, and a bound that never over-estimates can never
-        // let the character tunnel.
+        // Conservative advancement only needs a lower bound of the distance,
+        // and a bound that never over-estimates can never let a character
+        // tunnel through the gap.
         let point_a = pos_a + support_in(&ax, half_a, sep_normal);
         let point_b = pos_b + support_in(&bx, half_b, -sep_normal);
-        return Features { point_a, point_b, normal: sep_normal, separation: max_separation };
+        return Features {
+            point_a,
+            point_b,
+            normal: sep_normal,
+            separation: max_separation,
+        };
     }
 
     // Touching or overlapping: place the contact at the centroid of the
@@ -426,15 +501,18 @@ fn box_box(pos_a: Vec3, rot_a: Quat, half_a: Vec3, pos_b: Vec3, rot_b: Quat, hal
     let (point_a, point_b) = if mtv_ref_is_a {
         // `a` carries the reference face; `b` is incident and lies on the +mtv
         // side of `a`.
-        let (reference, incident) =
-            contact_features(pos_a, &ax, half_a, pos_b, &bx, half_b, mtv);
+        let (reference, incident) = contact_features(pos_a, &ax, half_a, pos_b, &bx, half_b, mtv);
         (reference, incident)
     } else {
-        let (reference, incident) =
-            contact_features(pos_b, &bx, half_b, pos_a, &ax, half_a, -mtv);
+        let (reference, incident) = contact_features(pos_b, &bx, half_b, pos_a, &ax, half_a, -mtv);
         (incident, reference)
     };
-    Features { point_a, point_b, normal: mtv, separation: -min_overlap }
+    Features {
+        point_a,
+        point_b,
+        normal: mtv,
+        separation: -min_overlap,
+    }
 }
 
 /// The three orthonormal axes of a box, as world-space unit vectors.
@@ -447,7 +525,19 @@ fn box_axes(rotation: Quat) -> [Vec3; 3] {
     ]
 }
 
-/// The support extent of a box along `dir`: `sum |half_i * axis_i · dir|`.
+/// World vector -> box-local vector.
+#[inline]
+fn to_local(v: Vec3, axes: &[Vec3; 3]) -> Vec3 {
+    Vec3::new(v.dot(axes[0]), v.dot(axes[1]), v.dot(axes[2]))
+}
+
+/// Box-local vector -> world vector.
+#[inline]
+fn to_world(local: Vec3, axes: &[Vec3; 3]) -> Vec3 {
+    axes[0] * local.x + axes[1] * local.y + axes[2] * local.z
+}
+
+/// The support extent of a box along `dir`: `sum |half_i * axis_i . dir|`.
 #[inline]
 fn project_extent(axes: &[Vec3; 3], half: Vec3, dir: Vec3) -> f32 {
     axes[0].dot(dir).abs() * half.x
@@ -500,9 +590,7 @@ fn contact_features(
     let mut deepest_projection = f32::INFINITY;
     for vertex in vertices {
         let local = vertex - ref_center;
-        let inside = (0..3).all(|i| {
-            local.dot(ref_axes[i]).abs() <= ref_half[i] + CONTACT_EPSILON
-        });
+        let inside = (0..3).all(|i| local.dot(ref_axes[i]).abs() <= ref_half[i] + CONTACT_EPSILON);
         if inside {
             sum += vertex;
             count += 1;
@@ -513,7 +601,11 @@ fn contact_features(
             deepest = vertex;
         }
     }
-    let incident = if count > 0 { sum * (1.0 / count as f32) } else { deepest };
+    let incident = if count > 0 {
+        sum * (1.0 / count as f32)
+    } else {
+        deepest
+    };
     let signed = (incident - ref_center).dot(dir_to_incident) - extent_ref;
     let reference = incident - dir_to_incident * signed;
     (reference, incident)
@@ -532,14 +624,9 @@ pub(crate) fn closest_point_on_segment(p: Vec3, p0: Vec3, p1: Vec3) -> Vec3 {
 }
 
 /// The closest pair of points on two segments (Ericson, *Real-Time Collision
-/// Detection* §5.1.9).
+/// Detection* section 5.1.9).
 #[must_use]
-pub(crate) fn closest_points_segments(
-    p1: Vec3,
-    q1: Vec3,
-    p2: Vec3,
-    q2: Vec3,
-) -> (Vec3, Vec3) {
+pub(crate) fn closest_points_segments(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec3) {
     let d1 = q1 - p1;
     let d2 = q2 - p2;
     let r = p1 - p2;
@@ -562,7 +649,11 @@ pub(crate) fn closest_points_segments(
         } else {
             let b = d1.dot(d2);
             let denom = a * e - b * b;
-            let mut s_raw = if denom > EPS { (b * f - c * e) / denom } else { 0.0 };
+            let mut s_raw = if denom > EPS {
+                (b * f - c * e) / denom
+            } else {
+                0.0
+            };
             s_raw = s_raw.clamp(0.0, 1.0);
             let mut t_raw = (b * s_raw + f) / e;
             if t_raw < 0.0 {
@@ -605,7 +696,9 @@ pub(crate) fn closest_point_segment_aabb(p0: Vec3, p1: Vec3, half: Vec3) -> (Vec
         if d[i].abs() > 1e-12 {
             for bound in [-half[i], half[i]] {
                 let t = (bound - p0[i]) / d[i];
-                if t > 0.0 && t < 1.0 {
+                // Three axes with two bounds each plus the two endpoints fit in
+                // the array exactly; the guard keeps that invariant explicit.
+                if t > 0.0 && t < 1.0 && count < breaks.len() {
                     breaks[count] = t;
                     count += 1;
                 }
@@ -659,10 +752,15 @@ mod tests {
         ColliderShape::Sphere { radius: r }
     }
     fn boxx(h: f32) -> ColliderShape {
-        ColliderShape::Box { half_extents: Vec3::splat(h) }
+        ColliderShape::Box {
+            half_extents: Vec3::splat(h),
+        }
     }
     fn capsule(r: f32, hh: f32) -> ColliderShape {
-        ColliderShape::Capsule { radius: r, half_height: hh }
+        ColliderShape::Capsule {
+            radius: r,
+            half_height: hh,
+        }
     }
 
     fn features(a: &ColliderShape, pa: Vec3, b: &ColliderShape, pb: Vec3) -> Features {
@@ -671,7 +769,12 @@ mod tests {
 
     #[test]
     fn sphere_sphere_normal_points_from_a_to_b() {
-        let f = features(&sphere(1.0), Vec3::ZERO, &sphere(1.0), Vec3::new(3.0, 0.0, 0.0));
+        let f = features(
+            &sphere(1.0),
+            Vec3::ZERO,
+            &sphere(1.0),
+            Vec3::new(3.0, 0.0, 0.0),
+        );
         assert!((f.normal - Vec3::X).length() < EPS);
         assert!((f.separation - 1.0).abs() < EPS, "3 - 1 - 1");
         assert!((f.point_a - Vec3::X).length() < EPS);
@@ -680,14 +783,29 @@ mod tests {
 
     #[test]
     fn sphere_sphere_penetration_is_negative_separation() {
-        let f = features(&sphere(1.0), Vec3::ZERO, &sphere(1.0), Vec3::new(1.5, 0.0, 0.0));
+        let f = features(
+            &sphere(1.0),
+            Vec3::ZERO,
+            &sphere(1.0),
+            Vec3::new(1.5, 0.0, 0.0),
+        );
         assert!((f.separation + 0.5).abs() < EPS, "1.5 - 2.0");
     }
 
     #[test]
     fn sphere_sphere_symmetry() {
-        let a = features(&sphere(0.5), Vec3::new(1.0, 2.0, 3.0), &sphere(2.0), Vec3::new(-1.0, 0.0, 0.0));
-        let b = features(&sphere(2.0), Vec3::new(-1.0, 0.0, 0.0), &sphere(0.5), Vec3::new(1.0, 2.0, 3.0));
+        let a = features(
+            &sphere(0.5),
+            Vec3::new(1.0, 2.0, 3.0),
+            &sphere(2.0),
+            Vec3::new(-1.0, 0.0, 0.0),
+        );
+        let b = features(
+            &sphere(2.0),
+            Vec3::new(-1.0, 0.0, 0.0),
+            &sphere(0.5),
+            Vec3::new(1.0, 2.0, 3.0),
+        );
         assert!((a.normal + b.normal).length() < EPS);
         assert!((a.separation - b.separation).abs() < EPS);
         assert!((a.point_a - b.point_b).length() < EPS);
@@ -696,7 +814,12 @@ mod tests {
     #[test]
     fn sphere_box_face_contact() {
         // Sphere of radius 0.5 at y = 1.5 above a unit box whose top is y = 0.5.
-        let f = features(&sphere(0.5), Vec3::new(0.0, 1.5, 0.0), &boxx(0.5), Vec3::ZERO);
+        let f = features(
+            &sphere(0.5),
+            Vec3::new(0.0, 1.5, 0.0),
+            &boxx(0.5),
+            Vec3::ZERO,
+        );
         assert!((f.separation - 0.5).abs() < EPS, "gap = 1.5 - 0.5 - 0.5");
         assert!((f.normal - Vec3::DOWN).length() < EPS, "{:?}", f.normal);
     }
@@ -705,19 +828,38 @@ mod tests {
     fn sphere_box_corner_uses_corner_normal() {
         // Sphere beyond the box corner (0.5, 0.5, 0.5); centre to corner is
         // (0.5, 0.5, 0.5), length sqrt(0.75) = 0.8660.
-        let f = features(&sphere(0.25), Vec3::new(1.0, 1.0, 1.0), &boxx(0.5), Vec3::ZERO);
+        let f = features(
+            &sphere(0.25),
+            Vec3::new(1.0, 1.0, 1.0),
+            &boxx(0.5),
+            Vec3::ZERO,
+        );
         let expected = Vec3::splat(0.5).length() - 0.25;
-        assert!((f.separation - expected).abs() < EPS, "{} vs {}", f.separation, expected);
+        assert!(
+            (f.separation - expected).abs() < EPS,
+            "{} vs {}",
+            f.separation,
+            expected
+        );
         assert!((f.normal.length() - 1.0).abs() < EPS);
         // The normal points from the sphere (a) towards the box (b).
-        assert!((f.normal + Vec3::splat(1.0 / 3.0f32.sqrt())).length() < EPS, "{:?}", f.normal);
+        assert!(
+            (f.normal + Vec3::splat(1.0 / 3.0f32.sqrt())).length() < EPS,
+            "{:?}",
+            f.normal
+        );
     }
 
     #[test]
     fn sphere_inside_box_escapes_through_nearest_face() {
         // Centre 0.1 below the top face: depth to the top = 0.5 - 0.4 = 0.1,
         // so penetration = 0.1 + radius.
-        let f = features(&sphere(0.25), Vec3::new(0.0, 0.4, 0.0), &boxx(0.5), Vec3::ZERO);
+        let f = features(
+            &sphere(0.25),
+            Vec3::new(0.0, 0.4, 0.0),
+            &boxx(0.5),
+            Vec3::ZERO,
+        );
         assert!((f.separation + 0.35).abs() < EPS, "{}", f.separation);
         // Normal points from the sphere towards the box, i.e. downwards
         // because the sphere escapes upwards.
@@ -741,7 +883,10 @@ mod tests {
         // Contact point is the centroid of the incident box's four penetrating
         // bottom vertices: the centre of that face.
         let midpoint = (f.point_a + f.point_b) * 0.5;
-        assert!(midpoint.x.abs() < EPS && midpoint.z.abs() < EPS, "{midpoint:?}");
+        assert!(
+            midpoint.x.abs() < EPS && midpoint.z.abs() < EPS,
+            "{midpoint:?}"
+        );
         assert!((midpoint.y - 0.45).abs() < 0.05, "{midpoint:?}");
     }
 
@@ -756,9 +901,20 @@ mod tests {
     fn box_box_yawed_edge_axis_is_found() {
         // A yawed box overlapping a flat one: SAT must find the cross axis,
         // and the result must still be a unit normal with a sensible depth.
-        let a = ColliderShape::Box { half_extents: Vec3::new(2.0, 0.5, 0.2) };
-        let b = ColliderShape::Box { half_extents: Vec3::new(2.0, 0.5, 0.2) };
-        let f = closest_features(&a, Vec3::ZERO, Quat::IDENTITY, &b, Vec3::new(0.0, 0.0, 0.3), Quat::IDENTITY);
+        let a = ColliderShape::Box {
+            half_extents: Vec3::new(2.0, 0.5, 0.2),
+        };
+        let b = ColliderShape::Box {
+            half_extents: Vec3::new(2.0, 0.5, 0.2),
+        };
+        let f = closest_features(
+            &a,
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            &b,
+            Vec3::new(0.0, 0.0, 0.3),
+            Quat::IDENTITY,
+        );
         assert!((f.normal.length() - 1.0).abs() < EPS);
         assert!(f.separation < 0.0);
     }
@@ -767,21 +923,36 @@ mod tests {
     fn capsule_box_resting_on_top() {
         // Capsule (r = 0.4, half height 0.5) lying vertically with its bottom
         // cap centre at y = 0.9, above a box whose top is y = 0.5.
-        let f = features(&capsule(0.4, 0.5), Vec3::new(0.0, 1.4, 0.0), &boxx(0.5), Vec3::ZERO);
+        let f = features(
+            &capsule(0.4, 0.5),
+            Vec3::new(0.0, 1.4, 0.0),
+            &boxx(0.5),
+            Vec3::ZERO,
+        );
         assert!((f.separation - 0.0).abs() < EPS, "0.9 - 0.5 - 0.4 = 0");
         assert!((f.normal - Vec3::DOWN).length() < EPS, "{:?}", f.normal);
     }
 
     #[test]
     fn capsule_box_penetration_matches_overlap() {
-        let f = features(&capsule(0.4, 0.5), Vec3::new(0.0, 1.3, 0.0), &boxx(0.5), Vec3::ZERO);
+        let f = features(
+            &capsule(0.4, 0.5),
+            Vec3::new(0.0, 1.3, 0.0),
+            &boxx(0.5),
+            Vec3::ZERO,
+        );
         assert!((f.separation + 0.1).abs() < EPS, "{}", f.separation);
     }
 
     #[test]
     fn capsule_box_side_contact_is_horizontal() {
         // Capsule axis on the +X side of the box, 0.9 from centre.
-        let f = features(&capsule(0.25, 0.5), Vec3::new(0.9, 0.0, 0.0), &boxx(0.5), Vec3::ZERO);
+        let f = features(
+            &capsule(0.25, 0.5),
+            Vec3::new(0.9, 0.0, 0.0),
+            &boxx(0.5),
+            Vec3::ZERO,
+        );
         assert!((f.normal + Vec3::X).length() < EPS, "{:?}", f.normal);
         assert!((f.separation - 0.15).abs() < EPS, "0.9 - 0.5 - 0.25");
     }
@@ -815,7 +986,10 @@ mod tests {
 
     #[test]
     fn cylinder_collides_as_its_bounding_box() {
-        let cyl = ColliderShape::Cylinder { radius: 0.5, half_height: 1.0 };
+        let cyl = ColliderShape::Cylinder {
+            radius: 0.5,
+            half_height: 1.0,
+        };
         let f = features(&sphere(0.5), Vec3::new(0.0, 2.0, 0.0), &cyl, Vec3::ZERO);
         // Box top at y = 1.0, sphere bottom at 1.5 -> gap 0.5.
         assert!((f.separation - 0.5).abs() < EPS, "{}", f.separation);
@@ -826,20 +1000,35 @@ mod tests {
         use crate::body::BodyDesc;
         use noxel_core::pool::Handle;
         let make = |y: f32| {
-            BodyDesc::dynamic(sphere(0.5)).at(Vec3::new(0.0, y, 0.0)).build()
+            BodyDesc::dynamic(sphere(0.5))
+                .at(Vec3::new(0.0, y, 0.0))
+                .build()
         };
         let a = make(0.0);
         let b = make(1.004);
         let c = make(1.006);
-        let (ha, hb, hc) = (Handle::from_bits(1), Handle::from_bits(2), Handle::from_bits(3));
-        assert!(contact_between(ha, hb, &a, &b, 0.005).is_some(), "gap 0.004 <= 0.005");
-        assert!(contact_between(ha, hc, &a, &c, 0.005).is_none(), "gap 0.006 > 0.005");
+        let (ha, hb, hc) = (
+            Handle::from_bits(1),
+            Handle::from_bits(2),
+            Handle::from_bits(3),
+        );
+        assert!(
+            contact_between(ha, hb, &a, &b, 0.005).is_some(),
+            "gap 0.004 <= 0.005"
+        );
+        assert!(
+            contact_between(ha, hc, &a, &c, 0.005).is_none(),
+            "gap 0.006 > 0.005"
+        );
         let contact = contact_between(ha, hb, &a, &b, 0.005).unwrap();
         assert_eq!(contact.a, ha);
         assert_eq!(contact.b, hb);
         assert!(!contact.is_sensor);
         assert!((contact.normal - Vec3::Y).length() < EPS);
-        assert!((contact.penetration - 0.0).abs() < EPS, "not penetrating yet");
+        assert!(
+            (contact.penetration - 0.0).abs() < EPS,
+            "not penetrating yet"
+        );
     }
 
     #[test]
@@ -875,7 +1064,11 @@ mod tests {
             Vec3::new(5.0, 0.0, 0.0),
             Vec3::splat(1.0),
         );
-        assert!(((b - seg).length() - 4.0).abs() < 1e-3, "{}", (b - seg).length());
+        assert!(
+            ((b - seg).length() - 4.0).abs() < 1e-3,
+            "{}",
+            (b - seg).length()
+        );
         assert!((b.x - 1.0).abs() < EPS && b.z.abs() < EPS, "{b:?}");
     }
 
@@ -897,14 +1090,28 @@ mod tests {
             boxx(0.5),
             sphere(0.5),
             capsule(0.3, 0.6),
-            ColliderShape::Cylinder { radius: 0.4, half_height: 0.7 },
+            ColliderShape::Cylinder {
+                radius: 0.4,
+                half_height: 0.7,
+            },
         ];
         for (i, a) in shapes.iter().enumerate() {
             for (j, b) in shapes.iter().enumerate() {
                 let pa = Vec3::new(i as f32 * 0.3, 0.1, 0.0);
                 let pb = Vec3::new(j as f32 * 0.25, 0.2, 0.1);
-                let f = closest_features(a, pa, Quat::from_rotation_y(0.3), b, pb, Quat::from_rotation_y(-0.7));
-                assert!((f.normal.length() - 1.0).abs() < 1e-3, "{a:?} vs {b:?}: {:?}", f.normal);
+                let f = closest_features(
+                    a,
+                    pa,
+                    Quat::from_rotation_y(0.3),
+                    b,
+                    pb,
+                    Quat::from_rotation_y(-0.7),
+                );
+                assert!(
+                    (f.normal.length() - 1.0).abs() < 1e-3,
+                    "{a:?} vs {b:?}: {:?}",
+                    f.normal
+                );
                 assert!(f.separation.is_finite(), "{a:?} vs {b:?}");
                 assert!(f.point_a.is_finite() && f.point_b.is_finite());
             }

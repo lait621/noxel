@@ -656,9 +656,7 @@ impl BitSet {
 
     /// Clears every bit, keeping the allocation.
     pub fn clear(&mut self) {
-        for w in &mut self.words {
-            *w = 0;
-        }
+        self.words.fill(0);
         self.len = 0;
     }
 
@@ -677,7 +675,7 @@ impl BitSet {
 
     /// In-place union with `other`.
     pub fn union_with(&mut self, other: &BitSet) {
-        self.reserve_bits(other.capacity().saturating_sub(1).max(0));
+        self.reserve_bits(other.capacity().saturating_sub(1));
         for (i, w) in other.words.iter().enumerate() {
             if i < self.words.len() {
                 self.words[i] |= *w;

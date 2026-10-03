@@ -169,8 +169,6 @@ struct ShadeMaterial {
     alpha: f32,
     /// Skip lighting entirely.
     unlit: bool,
-    /// Shade both faces.
-    double_sided: bool,
     /// Transparency handling.
     alpha_mode: AlphaMode,
     /// Whether the surface receives shadows.
@@ -241,7 +239,7 @@ impl TileBins {
     }
 
     /// Rebins the triangles for a frame of the given size.
-    pub fn build(&mut self, width: u32, height: u32, tile_size: u32, triangles: &[ScreenTriangle]) {
+    fn build(&mut self, width: u32, height: u32, tile_size: u32, triangles: &[ScreenTriangle]) {
         self.tile_size = tile_size.max(8);
         self.cols = width.div_ceil(self.tile_size).max(1);
         self.rows = height.div_ceil(self.tile_size).max(1);
@@ -319,8 +317,6 @@ struct ShadeContext<'a> {
     settings: &'a RenderSettings,
     materials: &'a [ShadeMaterial],
     shadow: &'a ShadowMap,
-    /// Framebuffer width, i.e. the row stride of the full buffer.
-    width: u32,
 }
 
 /// One row band of the framebuffer, owned exclusively by one worker.
@@ -800,7 +796,6 @@ fn rasterize(
             settings,
             materials,
             shadow,
-            width,
         };
 
         // Bands are whole *tile* rows, so every band's pixel rows line up with
@@ -943,8 +938,7 @@ fn raster_tile_in_band(
     let x1 = ((tx as i32 + 1) * tile).min(tri_max_x);
     // Band-local pixel rows for this tile row.
     let y_start = (local_tile_row as i32 * tile).max(tri_min_y - band.row_start as i32);
-    let y_end =
-        (((local_tile_row as i32 + 1) * tile) as i32).min(tri_max_y - band.row_start as i32);
+    let y_end = ((local_tile_row as i32 + 1) * tile).min(tri_max_y - band.row_start as i32);
     let y_end = y_end.min(band.rows as i32);
     let x1 = x1.min(band.stride as i32);
     if x0 >= x1 || y_start >= y_end {
@@ -1054,7 +1048,7 @@ fn raster_tile_in_band(
 }
 
 /// The texture a material points at, if any.
-fn material_texture<'a>(scene: &'a Scene, handle: MaterialHandle) -> Option<&'a Texture> {
+fn material_texture(scene: &Scene, handle: MaterialHandle) -> Option<&Texture> {
     let material = scene.material(handle)?;
     scene.texture(material.texture?)
 }
@@ -1162,7 +1156,6 @@ fn shade_material(material: &Material, handle: MaterialHandle, alpha: f32) -> Sh
         emissive: [emissive.r, emissive.g, emissive.b],
         alpha: base.a * alpha,
         unlit: material.unlit,
-        double_sided: material.double_sided,
         alpha_mode: material.alpha_mode,
         receive_shadow: material.receive_shadow,
     }

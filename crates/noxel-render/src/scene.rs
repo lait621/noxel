@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn add_and_look_up_resources() {
-        let (mut scene, mesh, mat) = setup();
+        let (scene, mesh, mat) = setup();
         assert_eq!(scene.mesh_count(), 1);
         assert_eq!(scene.material_count(), 1);
         assert!(scene.mesh(mesh).is_some());
@@ -756,7 +756,7 @@ mod tests {
 
     #[test]
     fn box_instance_helper() {
-        let (mut scene, mesh, mat) = setup();
+        let (scene, mesh, mat) = setup();
         let _ = scene;
         let inst = box_instance(
             mesh,

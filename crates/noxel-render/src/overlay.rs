@@ -421,6 +421,7 @@ impl Overlay {
     }
 
     /// Draws an outlined or filled screen-space rectangle.
+    #[allow(clippy::too_many_arguments)]
     pub fn screen_rect(
         &self,
         target: &mut Framebuffer,
@@ -1031,7 +1032,7 @@ mod tests {
     #[test]
     fn default_overlay_depth_tests() {
         assert!(Overlay::new().depth_test());
-        assert_eq!(Overlay::default().depth_test(), true);
+        assert!(Overlay::default().depth_test());
     }
 
     #[test]

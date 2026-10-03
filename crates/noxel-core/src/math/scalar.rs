@@ -132,11 +132,16 @@ pub fn smootherstep(edge0: f32, edge1: f32, x: f32) -> f32 {
 #[inline]
 #[must_use]
 pub fn damp_factor(smoothing: f32, dt: f32) -> f32 {
-    if smoothing <= 0.0 {
-        0.0
-    } else {
-        1.0 - smoothing.clamp(0.0, 1.0).powf(dt.max(0.0))
+    if dt <= 0.0 {
+        // No time has passed, so nothing may move - including when the caller
+        // asked to snap, which would otherwise be an instant teleport.
+        return 0.0;
     }
+    if smoothing <= 0.0 {
+        // Zero remaining fraction means "already there": snap.
+        return 1.0;
+    }
+    1.0 - smoothing.clamp(0.0, 1.0).powf(dt)
 }
 
 /// Frame-rate independent exponential approach of `current` towards `target`.

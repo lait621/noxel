@@ -230,19 +230,15 @@ impl<'a, E> EventReader<'a, E> {
 
     /// Calls `f` for every remaining event.
     pub fn for_each_remaining(&mut self, mut f: impl FnMut(&E)) {
-        while let Some(e) = self.next() {
+        for e in self.by_ref() {
             f(e);
         }
     }
 
     /// The last remaining event, consuming the reader.
     #[must_use]
-    pub fn last_event(mut self) -> Option<&'a E> {
-        let mut last = None;
-        while let Some(e) = self.next() {
-            last = Some(e);
-        }
-        last
+    pub fn last_event(self) -> Option<&'a E> {
+        self.last()
     }
 }
 

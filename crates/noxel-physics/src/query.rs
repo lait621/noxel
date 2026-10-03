@@ -40,19 +40,33 @@ impl Default for QueryFilter {
     /// reject every body, and excluding static geometry by default would make a
     /// line-of-sight ray pass straight through the level.
     fn default() -> Self {
-        Self { mask: LAYER_ALL, ignore: None, include_sensors: false, include_static: true }
+        Self {
+            mask: LAYER_ALL,
+            ignore: None,
+            include_sensors: false,
+            include_static: true,
+        }
     }
 }
 
 impl QueryFilter {
     /// Everything, including sensors.
-    pub const ALL: Self =
-        Self { mask: LAYER_ALL, ignore: None, include_sensors: true, include_static: true };
+    pub const ALL: Self = Self {
+        mask: LAYER_ALL,
+        ignore: None,
+        include_sensors: true,
+        include_static: true,
+    };
 
     /// A filter restricted to `mask`, otherwise permissive.
     #[must_use]
     pub const fn with_mask(mask: u32) -> Self {
-        Self { mask, ignore: None, include_sensors: true, include_static: true }
+        Self {
+            mask,
+            ignore: None,
+            include_sensors: true,
+            include_static: true,
+        }
     }
 
     /// Skips `handle` (usually the body casting the query).
@@ -137,13 +151,24 @@ impl PhysicsWorld {
     pub fn raycast(&self, ray: &Ray, filter: QueryFilter) -> Option<RaycastHit> {
         let (origin, dir, max_t) = ray_parameters(ray)?;
         let mut candidates = Vec::new();
-        self.gather_candidates(sweep_bounds(origin, dir, max_t, 0.0), &filter, &mut candidates);
+        self.gather_candidates(
+            sweep_bounds(origin, dir, max_t, 0.0),
+            &filter,
+            &mut candidates,
+        );
         let mut best: Option<RaycastHit> = None;
         for handle in candidates {
-            let Some(body) = self.body(handle) else { continue };
-            let Some((distance, normal)) =
-                ray_shape(&body.shape, body.position, body.rotation, origin, dir, max_t)
-            else {
+            let Some(body) = self.body(handle) else {
+                continue;
+            };
+            let Some((distance, normal)) = ray_shape(
+                &body.shape,
+                body.position,
+                body.rotation,
+                origin,
+                dir,
+                max_t,
+            ) else {
                 continue;
             };
             if best.as_ref().is_none_or(|b| distance < b.distance) {
@@ -164,14 +189,27 @@ impl PhysicsWorld {
     /// `out` is cleared first.
     pub fn raycast_all(&self, ray: &Ray, filter: QueryFilter, out: &mut Vec<RaycastHit>) {
         out.clear();
-        let Some((origin, dir, max_t)) = ray_parameters(ray) else { return };
+        let Some((origin, dir, max_t)) = ray_parameters(ray) else {
+            return;
+        };
         let mut candidates = Vec::new();
-        self.gather_candidates(sweep_bounds(origin, dir, max_t, 0.0), &filter, &mut candidates);
+        self.gather_candidates(
+            sweep_bounds(origin, dir, max_t, 0.0),
+            &filter,
+            &mut candidates,
+        );
         for handle in candidates {
-            let Some(body) = self.body(handle) else { continue };
-            if let Some((distance, normal)) =
-                ray_shape(&body.shape, body.position, body.rotation, origin, dir, max_t)
-            {
+            let Some(body) = self.body(handle) else {
+                continue;
+            };
+            if let Some((distance, normal)) = ray_shape(
+                &body.shape,
+                body.position,
+                body.rotation,
+                origin,
+                dir,
+                max_t,
+            ) {
                 out.push(RaycastHit {
                     body: handle,
                     distance,
@@ -182,7 +220,9 @@ impl PhysicsWorld {
             }
         }
         out.sort_unstable_by(|a, b| {
-            a.distance.total_cmp(&b.distance).then_with(|| a.body.cmp(&b.body))
+            a.distance
+                .total_cmp(&b.distance)
+                .then_with(|| a.body.cmp(&b.body))
         });
     }
 
@@ -200,7 +240,9 @@ impl PhysicsWorld {
         if !center.is_finite() || !radius.is_finite() || radius < 0.0 {
             return;
         }
-        let probe = ColliderShape::Sphere { radius: radius.max(1e-6) };
+        let probe = ColliderShape::Sphere {
+            radius: radius.max(1e-6),
+        };
         let bounds = probe.aabb(center, Quat::IDENTITY);
         self.overlap_probe(&probe, center, Quat::IDENTITY, bounds, filter, out);
     }
@@ -231,9 +273,17 @@ impl PhysicsWorld {
     ) {
         self.gather_candidates(bounds, &filter, out);
         out.retain(|&handle| {
-            let Some(body) = self.body(handle) else { return false };
-            let features =
-                closest_features(probe, center, rotation, &body.shape, body.position, body.rotation);
+            let Some(body) = self.body(handle) else {
+                return false;
+            };
+            let features = closest_features(
+                probe,
+                center,
+                rotation,
+                &body.shape,
+                body.position,
+                body.rotation,
+            );
             features.separation <= 0.0
         });
     }
@@ -262,7 +312,9 @@ impl PhysicsWorld {
             return None;
         }
         let end = position + dir * max_distance;
-        let bounds = shape.aabb(position, rotation).union(&shape.aabb(end, rotation));
+        let bounds = shape
+            .aabb(position, rotation)
+            .union(&shape.aabb(end, rotation));
         let mut candidates = Vec::new();
         self.gather_candidates(bounds.expanded(SKIN), filter, &mut candidates);
 
@@ -273,7 +325,9 @@ impl PhysicsWorld {
             let mut advance = f32::INFINITY;
             let mut nearest: Option<SweepHit> = None;
             for &handle in &candidates {
-                let Some(body) = self.body(handle) else { continue };
+                let Some(body) = self.body(handle) else {
+                    continue;
+                };
                 let features = closest_features(
                     shape,
                     current,
@@ -305,7 +359,10 @@ impl PhysicsWorld {
             };
             last = Some(hit);
             if advance <= ADVANCE_CONVERGENCE {
-                return last.map(|hit| SweepHit { distance: travelled, ..hit });
+                return last.map(|hit| SweepHit {
+                    distance: travelled,
+                    ..hit
+                });
             }
             travelled += advance;
             if travelled >= max_distance {
@@ -313,7 +370,10 @@ impl PhysicsWorld {
             }
         }
         // Ran out of iterations: report the conservative position reached.
-        last.map(|hit| SweepHit { distance: travelled.min(max_distance), ..hit })
+        last.map(|hit| SweepHit {
+            distance: travelled.min(max_distance),
+            ..hit
+        })
     }
 }
 
@@ -326,7 +386,11 @@ fn ray_parameters(ray: &Ray) -> Option<(Vec3, Vec3, f32)> {
     if dir == Vec3::ZERO {
         return None;
     }
-    let max_t = if ray.max_t.is_finite() { ray.max_t.max(0.0) } else { f32::INFINITY };
+    let max_t = if ray.max_t.is_finite() {
+        ray.max_t.max(0.0)
+    } else {
+        f32::INFINITY
+    };
     Some((ray.origin, dir, max_t))
 }
 
@@ -410,7 +474,10 @@ mod tests {
                 .at(Vec3::new(0.0, 0.0, 0.0)),
         );
         let hit = world
-            .raycast(&Ray::new(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0)), QueryFilter::default())
+            .raycast(
+                &Ray::new(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0)),
+                QueryFilter::default(),
+            )
             .unwrap();
         assert_eq!(hit.body, sphere);
         assert!((hit.distance - 4.0).abs() < 1e-4);
@@ -425,7 +492,10 @@ mod tests {
             half_height: 1.0,
         }));
         let hit = world
-            .raycast(&Ray::new(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0)), QueryFilter::default())
+            .raycast(
+                &Ray::new(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0)),
+                QueryFilter::default(),
+            )
             .unwrap();
         assert_eq!(hit.body, capsule);
         assert!((hit.distance - 4.5).abs() < 1e-4);
@@ -436,7 +506,10 @@ mod tests {
             half_height: 1.0,
         }));
         let hit = world
-            .raycast(&Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::DOWN), QueryFilter::default())
+            .raycast(
+                &Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::DOWN),
+                QueryFilter::default(),
+            )
             .unwrap();
         assert_eq!(hit.body, cylinder);
         assert!((hit.distance - 4.0).abs() < 1e-4);
@@ -447,7 +520,10 @@ mod tests {
             half_extents: Vec3::splat(0.5),
         }));
         let hit = world
-            .raycast(&Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::DOWN), QueryFilter::default())
+            .raycast(
+                &Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::DOWN),
+                QueryFilter::default(),
+            )
             .unwrap();
         assert_eq!(hit.body, boxy);
         assert!((hit.distance - 4.5).abs() < 1e-4);
@@ -457,10 +533,17 @@ mod tests {
     fn raycast_all_is_sorted_and_complete() {
         let mut world = PhysicsWorld::new(crate::config::PhysicsConfig::default());
         for y in [1.0f32, 3.0, 5.0] {
-            world.insert(BodyDesc::static_body(ColliderShape::Sphere { radius: 0.25 }).at(Vec3::new(0.0, y, 0.0)));
+            world.insert(
+                BodyDesc::static_body(ColliderShape::Sphere { radius: 0.25 })
+                    .at(Vec3::new(0.0, y, 0.0)),
+            );
         }
         let mut hits = Vec::new();
-        world.raycast_all(&Ray::new(Vec3::new(0.0, 10.0, 0.0), Vec3::DOWN), QueryFilter::ALL, &mut hits);
+        world.raycast_all(
+            &Ray::new(Vec3::new(0.0, 10.0, 0.0), Vec3::DOWN),
+            QueryFilter::ALL,
+            &mut hits,
+        );
         assert_eq!(hits.len(), 3);
         assert!((hits[0].distance - 4.75).abs() < 1e-4, "{:?}", hits[0]);
         assert!((hits[1].distance - 6.75).abs() < 1e-4);
@@ -477,20 +560,27 @@ mod tests {
                 .with_layer(crate::body::LAYER_PROP, LAYER_ALL),
         );
         let ray = Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::DOWN);
-        assert!(world.raycast(&ray, QueryFilter::with_mask(crate::body::LAYER_WORLD)).is_none());
-        let hit = world.raycast(&ray, QueryFilter::with_mask(crate::body::LAYER_PROP)).unwrap();
+        assert!(
+            world
+                .raycast(&ray, QueryFilter::with_mask(crate::body::LAYER_WORLD))
+                .is_none()
+        );
+        let hit = world
+            .raycast(&ray, QueryFilter::with_mask(crate::body::LAYER_PROP))
+            .unwrap();
         assert_eq!(hit.body, prop);
     }
 
     #[test]
     fn sensors_are_excluded_unless_requested() {
         let mut world = PhysicsWorld::new(crate::config::PhysicsConfig::default());
-        let trigger = world.insert(
-            BodyDesc::static_body(ColliderShape::Sphere { radius: 1.0 }).as_sensor(),
-        );
+        let trigger =
+            world.insert(BodyDesc::static_body(ColliderShape::Sphere { radius: 1.0 }).as_sensor());
         let ray = Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::DOWN);
         assert!(world.raycast(&ray, QueryFilter::default()).is_none());
-        let hit = world.raycast(&ray, QueryFilter::default().with_sensors(true)).unwrap();
+        let hit = world
+            .raycast(&ray, QueryFilter::default().with_sensors(true))
+            .unwrap();
         assert_eq!(hit.body, trigger);
     }
 
@@ -503,11 +593,26 @@ mod tests {
                 .at(Vec3::new(10.0, 0.0, 0.0)),
         );
         let mut out = Vec::new();
-        world.overlap_sphere(Vec3::new(0.0, 1.0, 0.0), 0.5, QueryFilter::default(), &mut out);
+        world.overlap_sphere(
+            Vec3::new(0.0, 1.0, 0.0),
+            0.5,
+            QueryFilter::default(),
+            &mut out,
+        );
         assert_eq!(out, vec![near], "exactly touching counts");
-        world.overlap_sphere(Vec3::new(0.0, 1.01, 0.0), 0.5, QueryFilter::default(), &mut out);
+        world.overlap_sphere(
+            Vec3::new(0.0, 1.01, 0.0),
+            0.5,
+            QueryFilter::default(),
+            &mut out,
+        );
         assert!(out.is_empty());
-        world.overlap_sphere(Vec3::new(10.0, 0.0, 0.0), 0.5, QueryFilter::default(), &mut out);
+        world.overlap_sphere(
+            Vec3::new(10.0, 0.0, 0.0),
+            0.5,
+            QueryFilter::default(),
+            &mut out,
+        );
         assert_eq!(out, vec![far]);
     }
 
@@ -515,12 +620,16 @@ mod tests {
     fn overlap_aabb_matches_containment() {
         let mut world = PhysicsWorld::new(crate::config::PhysicsConfig::default());
         let inside = world.insert(
-            BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(0.25) })
-                .at(Vec3::new(0.0, 0.0, 0.0)),
+            BodyDesc::static_body(ColliderShape::Box {
+                half_extents: Vec3::splat(0.25),
+            })
+            .at(Vec3::new(0.0, 0.0, 0.0)),
         );
         let outside = world.insert(
-            BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(0.25) })
-                .at(Vec3::new(5.0, 0.0, 0.0)),
+            BodyDesc::static_body(ColliderShape::Box {
+                half_extents: Vec3::splat(0.25),
+            })
+            .at(Vec3::new(5.0, 0.0, 0.0)),
         );
         let mut out = Vec::new();
         world.overlap_aabb(

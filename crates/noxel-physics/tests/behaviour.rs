@@ -20,7 +20,12 @@ fn floor_world() -> PhysicsWorld {
 }
 
 fn dynamic_box(world: &mut PhysicsWorld, half: f32, at: Vec3) -> BodyHandle {
-    world.insert(BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(half) }).at(at))
+    world.insert(
+        BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(half),
+        })
+        .at(at),
+    )
 }
 
 fn run(world: &mut PhysicsWorld, steps: u32) {
@@ -35,7 +40,10 @@ fn falling_box_rests_on_the_floor() {
     let b = dynamic_box(&mut world, 0.5, Vec3::new(0.0, 5.0, 0.0));
     run(&mut world, 240); // 4 s: a 4.5 m fall takes sqrt(2*4.5/19.62) = 0.68 s.
     let y = world.body(b).unwrap().position.y;
-    assert!((y - 0.5).abs() < 0.01, "resting centre y = {y}, expected 0.5");
+    assert!(
+        (y - 0.5).abs() < 0.01,
+        "resting centre y = {y}, expected 0.5"
+    );
     assert!(world.body(b).unwrap().linear_velocity.length() < 0.05);
 }
 
@@ -52,26 +60,49 @@ fn resting_box_does_not_sink_over_six_hundred_steps() {
         "drifted from {settled} to {after} over 10 s of rest"
     );
     assert!(after > 0.49, "must not sink below the floor, y = {after}");
-    assert!(world.body(b).unwrap().sleeping, "a resting body should be asleep");
+    assert!(
+        world.body(b).unwrap().sleeping,
+        "a resting body should be asleep"
+    );
 }
 
 #[test]
 fn every_collider_rests_at_its_analytic_height() {
     let cases: [(ColliderShape, f32); 4] = [
         // A box of half extent h rests with its centre h above the floor.
-        (ColliderShape::Box { half_extents: Vec3::splat(0.5) }, 0.5),
+        (
+            ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            },
+            0.5,
+        ),
         (ColliderShape::Sphere { radius: 0.5 }, 0.5),
         // Capsule: the bottom cap centre is half_height up, plus the radius.
-        (ColliderShape::Capsule { radius: 0.3, half_height: 0.5 }, 0.8),
+        (
+            ColliderShape::Capsule {
+                radius: 0.3,
+                half_height: 0.5,
+            },
+            0.8,
+        ),
         // Cylinder: half the height (it collides as its bounding box).
-        (ColliderShape::Cylinder { radius: 0.4, half_height: 0.6 }, 0.6),
+        (
+            ColliderShape::Cylinder {
+                radius: 0.4,
+                half_height: 0.6,
+            },
+            0.6,
+        ),
     ];
     for (shape, expected) in cases {
         let mut world = floor_world();
         let body = world.insert(BodyDesc::dynamic(shape).at(Vec3::new(0.0, 3.0, 0.0)));
         run(&mut world, 300);
         let y = world.body(body).unwrap().position.y;
-        assert!((y - expected).abs() < 0.01, "{shape:?} rests at {y}, expected {expected}");
+        assert!(
+            (y - expected).abs() < 0.01,
+            "{shape:?} rests at {y}, expected {expected}"
+        );
     }
 }
 
@@ -135,22 +166,32 @@ fn friction_decelerates_a_sliding_box_by_mu_g() {
     let mut world = PhysicsWorld::new(PhysicsConfig::default());
     world.set_gravity(Vec3::new(0.0, -10.0, 0.0));
     world.insert(
-        BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(10.0) })
-            .at(Vec3::new(0.0, -10.0, 0.0))
-            .with_friction(0.25),
+        BodyDesc::static_body(ColliderShape::Box {
+            half_extents: Vec3::splat(10.0),
+        })
+        .at(Vec3::new(0.0, -10.0, 0.0))
+        .with_friction(0.25),
     );
     let slider = world.insert(
-        BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 0.5, 0.0))
-            .with_friction(0.25)
-            .with_velocity(Vec3::new(5.0, 0.0, 0.0)),
+        BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 0.5, 0.0))
+        .with_friction(0.25)
+        .with_velocity(Vec3::new(5.0, 0.0, 0.0)),
     );
     run(&mut world, 60); // one second
     let vx = world.body(slider).unwrap().linear_velocity.x;
-    assert!((vx - 2.5).abs() < 0.15, "after 1 s at mu*g = 2.5 m/s^2, v = {vx}");
+    assert!(
+        (vx - 2.5).abs() < 0.15,
+        "after 1 s at mu*g = 2.5 m/s^2, v = {vx}"
+    );
     let x = world.body(slider).unwrap().position.x;
     // s = v0 t - a t^2 / 2 = 5 - 1.25 = 3.75 m.
-    assert!((x - 3.75).abs() < 0.2, "travelled {x} m, expected about 3.75");
+    assert!(
+        (x - 3.75).abs() < 0.2,
+        "travelled {x} m, expected about 3.75"
+    );
 }
 
 #[test]
@@ -158,19 +199,26 @@ fn a_frictionless_box_keeps_its_speed() {
     let mut world = PhysicsWorld::new(PhysicsConfig::default());
     world.set_gravity(Vec3::new(0.0, -10.0, 0.0));
     world.insert(
-        BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(10.0) })
-            .at(Vec3::new(0.0, -10.0, 0.0))
-            .with_friction(0.0),
+        BodyDesc::static_body(ColliderShape::Box {
+            half_extents: Vec3::splat(10.0),
+        })
+        .at(Vec3::new(0.0, -10.0, 0.0))
+        .with_friction(0.0),
     );
     let slider = world.insert(
-        BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 0.5, 0.0))
-            .with_friction(0.0)
-            .with_velocity(Vec3::new(5.0, 0.0, 0.0)),
+        BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 0.5, 0.0))
+        .with_friction(0.0)
+        .with_velocity(Vec3::new(5.0, 0.0, 0.0)),
     );
     run(&mut world, 60);
     let vx = world.body(slider).unwrap().linear_velocity.x;
-    assert!((vx - 5.0).abs() < 0.05, "frictionless slide keeps 5 m/s, got {vx}");
+    assert!(
+        (vx - 5.0).abs() < 0.05,
+        "frictionless slide keeps 5 m/s, got {vx}"
+    );
 }
 
 #[test]
@@ -179,7 +227,10 @@ fn a_body_sleeps_then_wakes_on_impulse() {
     let b = dynamic_box(&mut world, 0.5, Vec3::new(0.0, 0.6, 0.0));
     // sleep_time_required = 0.5 s, so 1.5 s of rest is plenty.
     run(&mut world, 90);
-    assert!(world.body(b).unwrap().sleeping, "the box should have settled");
+    assert!(
+        world.body(b).unwrap().sleeping,
+        "the box should have settled"
+    );
     assert!(world.stats().sleeping_bodies >= 1);
     assert_eq!(world.body(b).unwrap().linear_velocity, Vec3::ZERO);
 
@@ -198,12 +249,18 @@ fn a_body_sleeps_then_wakes_on_impulse() {
     // And an impulse on the body itself wakes it too.
     run(&mut world, 90);
     assert!(world.body(b).unwrap().sleeping);
-    world.body_mut(b).unwrap().apply_impulse(Vec3::new(0.0, 0.0, 3.0));
+    world
+        .body_mut(b)
+        .unwrap()
+        .apply_impulse(Vec3::new(0.0, 0.0, 3.0));
     assert!(!world.body(b).unwrap().sleeping);
 
     let before = world.body(b).unwrap().position.z;
     run(&mut world, 10);
-    assert!(world.body(b).unwrap().position.z > before + 0.05, "the impulse moved it");
+    assert!(
+        world.body(b).unwrap().position.z > before + 0.05,
+        "the impulse moved it"
+    );
 }
 
 #[test]
@@ -232,13 +289,19 @@ fn a_sleeping_body_wakes_when_a_moving_body_hits_it() {
         }
     }
     assert!(woke, "the impact must report a wake for the sleeping box");
-    assert!(awake_at_impact, "the sleeping box is awake while the impact resolves");
+    assert!(
+        awake_at_impact,
+        "the sleeping box is awake while the impact resolves"
+    );
     // And the pile comes back to rest.
     run(&mut world, 120);
     assert!(world.body(sleeper).unwrap().sleeping);
     assert!(world.body(projectile).unwrap().sleeping);
     let top = world.body(projectile).unwrap().position.y;
-    assert!((top - 1.5).abs() < 0.03, "the second box rests on the first, y = {top}");
+    assert!(
+        (top - 1.5).abs() < 0.03,
+        "the second box rests on the first, y = {top}"
+    );
 }
 
 #[test]
@@ -251,7 +314,13 @@ fn collision_enter_and_exit_fire_once_each() {
     for _ in 0..90 {
         world.step(1.0 / 60.0);
         for event in world.events() {
-            if let PhysicsEvent::CollisionEnter { a, b: other, impulse: j, .. } = *event {
+            if let PhysicsEvent::CollisionEnter {
+                a,
+                b: other,
+                impulse: j,
+                ..
+            } = *event
+            {
                 assert!(a < other, "the lower handle is always reported first");
                 enters += 1;
                 impulse = impulse.max(j);
@@ -277,10 +346,12 @@ fn collision_enter_and_exit_fire_once_each() {
 fn triggers_fire_enter_and_exit_without_pushing() {
     let mut world = floor_world();
     let trigger = world.insert(
-        BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::new(1.0, 0.5, 1.0) })
-            .at(Vec3::new(0.0, 1.5, 0.0))
-            .as_sensor()
-            .with_layer(LAYER_WORLD, LAYER_ALL),
+        BodyDesc::static_body(ColliderShape::Box {
+            half_extents: Vec3::new(1.0, 0.5, 1.0),
+        })
+        .at(Vec3::new(0.0, 1.5, 0.0))
+        .as_sensor()
+        .with_layer(LAYER_WORLD, LAYER_ALL),
     );
     let faller = world.insert(
         BodyDesc::dynamic(ColliderShape::Sphere { radius: 0.25 }).at(Vec3::new(0.0, 4.0, 0.0)),
@@ -323,9 +394,11 @@ fn layer_masks_decide_who_collides() {
     let make = |floor_mask: u32| {
         let mut world = PhysicsWorld::new(PhysicsConfig::default());
         world.insert(
-            BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(10.0) })
-                .at(Vec3::new(0.0, -10.0, 0.0))
-                .with_layer(LAYER_WORLD, floor_mask),
+            BodyDesc::static_body(ColliderShape::Box {
+                half_extents: Vec3::splat(10.0),
+            })
+            .at(Vec3::new(0.0, -10.0, 0.0))
+            .with_layer(LAYER_WORLD, floor_mask),
         );
         world.insert(
             BodyDesc::dynamic(ColliderShape::Sphere { radius: 0.5 })
@@ -339,21 +412,29 @@ fn layer_masks_decide_who_collides() {
     let ball = blocked.bodies().nth(1).map(|(h, _)| h).unwrap();
     run(&mut blocked, 180);
     let resting = blocked.body(ball).unwrap().position.y;
-    assert!((resting - 0.5).abs() < 0.01, "matching layers collide, y = {resting}");
+    assert!(
+        (resting - 0.5).abs() < 0.01,
+        "matching layers collide, y = {resting}"
+    );
 
     let mut ignored = make(LAYER_PLAYER);
     let ball = ignored.bodies().nth(1).map(|(h, _)| h).unwrap();
     run(&mut ignored, 180);
     let fallen = ignored.body(ball).unwrap().position.y;
-    assert!(fallen < -20.0, "a mismatched mask falls straight through, y = {fallen}");
+    assert!(
+        fallen < -20.0,
+        "a mismatched mask falls straight through, y = {fallen}"
+    );
 }
 
 #[test]
 fn queries_respect_change_after_set_position() {
     let mut world = floor_world();
     let b = world.insert(
-        BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 5.0, 0.0)),
+        BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 5.0, 0.0)),
     );
     let ray = Ray::new(Vec3::new(0.0, 10.0, 0.0), Vec3::DOWN);
     let first = world.raycast(&ray, QueryFilter::default()).unwrap();
@@ -363,7 +444,10 @@ fn queries_respect_change_after_set_position() {
     assert!(world.set_position(b, Vec3::new(5.0, 5.0, 0.0)));
     let after = world.raycast(&ray, QueryFilter::default()).unwrap();
     assert_ne!(after.body, b, "the box moved out of the ray");
-    assert!((after.distance - 10.0).abs() < 1e-3, "the ray now hits the floor");
+    assert!(
+        (after.distance - 10.0).abs() < 1e-3,
+        "the ray now hits the floor"
+    );
 }
 
 #[test]
@@ -382,7 +466,12 @@ fn overlap_queries_filter_by_layer_and_sensor() {
     );
 
     let mut out = Vec::new();
-    world.overlap_sphere(Vec3::new(0.0, 6.0, 0.0), 2.0, QueryFilter::default(), &mut out);
+    world.overlap_sphere(
+        Vec3::new(0.0, 6.0, 0.0),
+        2.0,
+        QueryFilter::default(),
+        &mut out,
+    );
     assert_eq!(out, vec![prop], "sensors are excluded by default");
 
     world.overlap_sphere(
@@ -416,8 +505,11 @@ fn raycast_reports_the_nearest_of_several_bodies() {
         BodyDesc::static_body(ColliderShape::Sphere { radius: 0.5 }).at(Vec3::new(0.0, 2.0, 0.0)),
     );
     let far = world.insert(
-        BodyDesc::static_body(ColliderShape::Capsule { radius: 0.5, half_height: 1.0 })
-            .at(Vec3::new(0.0, 6.0, 0.0)),
+        BodyDesc::static_body(ColliderShape::Capsule {
+            radius: 0.5,
+            half_height: 1.0,
+        })
+        .at(Vec3::new(0.0, 6.0, 0.0)),
     );
     let ray = Ray::new(Vec3::new(0.0, 20.0, 0.0), Vec3::DOWN);
     let mut hits = Vec::new();
@@ -443,10 +535,18 @@ fn determinism_is_bit_exact() {
         for i in 0..12 {
             let f = i as f32;
             let shape = match i % 4 {
-                0 => ColliderShape::Box { half_extents: Vec3::splat(0.4) },
+                0 => ColliderShape::Box {
+                    half_extents: Vec3::splat(0.4),
+                },
                 1 => ColliderShape::Sphere { radius: 0.4 },
-                2 => ColliderShape::Capsule { radius: 0.3, half_height: 0.4 },
-                _ => ColliderShape::Cylinder { radius: 0.35, half_height: 0.45 },
+                2 => ColliderShape::Capsule {
+                    radius: 0.3,
+                    half_height: 0.4,
+                },
+                _ => ColliderShape::Cylinder {
+                    radius: 0.35,
+                    half_height: 0.45,
+                },
             };
             world.insert(
                 BodyDesc::dynamic(shape)
@@ -458,14 +558,18 @@ fn determinism_is_bit_exact() {
             );
         }
         world.insert(
-            BodyDesc::kinematic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-                .at(Vec3::new(-4.0, 1.0, 0.0))
-                .with_velocity(Vec3::new(0.5, 0.0, 0.0)),
+            BodyDesc::kinematic(ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            })
+            .at(Vec3::new(-4.0, 1.0, 0.0))
+            .with_velocity(Vec3::new(0.5, 0.0, 0.0)),
         );
         world.insert(
-            BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(1.0) })
-                .at(Vec3::new(3.0, 1.0, 0.0))
-                .as_sensor(),
+            BodyDesc::static_body(ColliderShape::Box {
+                half_extents: Vec3::splat(1.0),
+            })
+            .at(Vec3::new(3.0, 1.0, 0.0))
+            .as_sensor(),
         );
         for _ in 0..180 {
             world.step(1.0 / 60.0);
@@ -521,18 +625,33 @@ fn non_finite_state_is_recovered_not_propagated() {
     run(&mut world, 5);
 
     let body = world.body(victim).unwrap();
-    assert!(body.position.is_finite(), "position recovered: {:?}", body.position);
+    assert!(
+        body.position.is_finite(),
+        "position recovered: {:?}",
+        body.position
+    );
     assert!(body.linear_velocity.is_finite());
     assert!(body.rotation.is_finite());
-    assert!(body.sleeping, "recovery is deliberately quiet: the body sleeps");
+    assert!(
+        body.sleeping,
+        "recovery is deliberately quiet: the body sleeps"
+    );
     assert!(
         (body.position.y - safe.y).abs() < 0.05,
         "recovered to the last finite spot: {} vs {}",
         body.position.y,
         safe.y
     );
-    assert!(world.body(neighbour).unwrap().position.is_finite(), "no neighbour poisoning");
-    assert!(world.events().iter().all(|e| !matches!(e, PhysicsEvent::CollisionEnter { .. })));
+    assert!(
+        world.body(neighbour).unwrap().position.is_finite(),
+        "no neighbour poisoning"
+    );
+    assert!(
+        world
+            .events()
+            .iter()
+            .all(|e| !matches!(e, PhysicsEvent::CollisionEnter { .. }))
+    );
 }
 
 #[test]
@@ -558,16 +677,21 @@ fn the_step_delta_is_clamped() {
     world.step(10.0); // clamped to max_step_delta = 0.05
     let v = world.body(b).unwrap().linear_velocity.y;
     // v = -g * dt = -19.62 * 0.05 = -0.981, nowhere near -196.
-    assert!((v + 19.62 * 0.05).abs() < 1e-3, "clamped dt produced v = {v}");
+    assert!(
+        (v + 19.62 * 0.05).abs() < 1e-3,
+        "clamped dt produced v = {v}"
+    );
 }
 
 #[test]
 fn kinematic_platform_pushes_a_crate() {
     let mut world = floor_world();
     let platform = world.insert(
-        BodyDesc::kinematic(ColliderShape::Box { half_extents: Vec3::new(0.5, 0.5, 3.0) })
-            .at(Vec3::new(-2.0, 0.5, 0.0))
-            .with_velocity(Vec3::new(3.0, 0.0, 0.0)),
+        BodyDesc::kinematic(ColliderShape::Box {
+            half_extents: Vec3::new(0.5, 0.5, 3.0),
+        })
+        .at(Vec3::new(-2.0, 0.5, 0.0))
+        .with_velocity(Vec3::new(3.0, 0.0, 0.0)),
     );
     let boxed = dynamic_box(&mut world, 0.5, Vec3::new(0.0, 0.5, 0.0));
     run(&mut world, 60);
@@ -575,7 +699,10 @@ fn kinematic_platform_pushes_a_crate() {
     assert!(moved > 0.2, "the platform pushed the crate to x = {moved}");
     // The platform itself must be unaffected by the collision.
     let platform_x = world.body(platform).unwrap().position.x;
-    assert!((platform_x - (-2.0 + 3.0)).abs() < 0.05, "platform at {platform_x}");
+    assert!(
+        (platform_x - (-2.0 + 3.0)).abs() < 0.05,
+        "platform at {platform_x}"
+    );
 }
 
 #[test]
@@ -598,17 +725,24 @@ fn kinematic_and_static_bodies_never_fall() {
 fn translate_kinematic_moves_only_movable_bodies() {
     let mut world = floor_world();
     let k = world.insert(
-        BodyDesc::kinematic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 1.0, 0.0)),
+        BodyDesc::kinematic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 1.0, 0.0)),
     );
     assert!(world.translate_kinematic(k, Vec3::new(2.0, 0.0, 0.0)));
     assert_eq!(world.body(k).unwrap().position, Vec3::new(2.0, 1.0, 0.0));
 
     let s = world.insert(
-        BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 1.0, 0.0)),
+        BodyDesc::static_body(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 1.0, 0.0)),
     );
-    assert!(!world.translate_kinematic(s, Vec3::X), "level geometry is built once");
+    assert!(
+        !world.translate_kinematic(s, Vec3::X),
+        "level geometry is built once"
+    );
     assert!(!world.translate_kinematic(k, Vec3::splat(f32::NAN)));
 }
 
@@ -627,7 +761,10 @@ fn body_lifecycle_and_stats() {
     let stats = world.stats();
     assert_eq!(stats.body_count, 3);
     assert_eq!(stats.solver_iterations, world.config().solver_iterations);
-    assert!(stats.broadphase_pairs >= 1, "the boxes overlap the floor's cells");
+    assert!(
+        stats.broadphase_pairs >= 1,
+        "the boxes overlap the floor's cells"
+    );
 
     assert!(world.remove(b));
     assert!(!world.remove(b), "removing twice fails");
@@ -643,7 +780,10 @@ fn body_lifecycle_and_stats() {
 
 #[test]
 fn max_bodies_limits_inserts() {
-    let mut world = PhysicsWorld::new(PhysicsConfig { max_bodies: 2, ..Default::default() });
+    let mut world = PhysicsWorld::new(PhysicsConfig {
+        max_bodies: 2,
+        ..Default::default()
+    });
     let a = dynamic_box(&mut world, 0.5, Vec3::ZERO);
     let b = dynamic_box(&mut world, 0.5, Vec3::X);
     let c = dynamic_box(&mut world, 0.5, Vec3::Z);
@@ -666,7 +806,10 @@ fn sleeping_bodies_do_not_react_to_a_resting_neighbour() {
     assert!(asleep_upper, "the top box should settle and sleep");
     assert!(asleep_lower, "the bottom box should settle and sleep");
     let y = world.body(upper).unwrap().position.y;
-    assert!((y - 1.5).abs() < 0.02, "the stack holds its shape, upper y = {y}");
+    assert!(
+        (y - 1.5).abs() < 0.02,
+        "the stack holds its shape, upper y = {y}"
+    );
 }
 
 #[test]
@@ -689,9 +832,11 @@ fn a_body_never_tunnels_a_thin_floor_when_it_starts_inside_it() {
 fn rotation_is_integrated_and_contacts_only_exchange_yaw() {
     let mut world = floor_world();
     let spun = world.insert(
-        BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 0.5, 0.0))
-            .with_angular_velocity(Vec3::new(0.0, 1.0, 0.0)),
+        BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 0.5, 0.0))
+        .with_angular_velocity(Vec3::new(0.0, 1.0, 0.0)),
     );
     world.step(1.0 / 60.0);
     let yaw = world.body(spun).unwrap().rotation.to_yaw();
@@ -701,8 +846,14 @@ fn rotation_is_integrated_and_contacts_only_exchange_yaw() {
     // Once it stops spinning the box must settle without any tumbling.
     run(&mut world, 120);
     let body = world.body(spun).unwrap();
-    assert!(body.angular_velocity.x.abs() < 1e-3, "no pitch from contacts");
-    assert!(body.angular_velocity.z.abs() < 1e-3, "no roll from contacts");
+    assert!(
+        body.angular_velocity.x.abs() < 1e-3,
+        "no pitch from contacts"
+    );
+    assert!(
+        body.angular_velocity.z.abs() < 1e-3,
+        "no roll from contacts"
+    );
 }
 
 #[test]
@@ -723,23 +874,49 @@ fn character_walks_a_course_of_steps_and_walls() {
         0,
     );
     let character = world.insert(
-        BodyDesc::kinematic(ColliderShape::Capsule { radius: 0.3, half_height: 0.5 })
-            .at(Vec3::new(0.0, 0.8, 0.0))
-            .with_layer(LAYER_PLAYER, LAYER_ALL),
+        BodyDesc::kinematic(ColliderShape::Capsule {
+            radius: 0.3,
+            half_height: 0.5,
+        })
+        .at(Vec3::new(0.0, 0.8, 0.0))
+        .with_layer(LAYER_PLAYER, LAYER_ALL),
     );
     world.step(1.0 / 60.0);
 
-    // Walk forward for a second at 2 m/s.
+    // Walk forward for two seconds at 2 m/s: 4 m of motion, more than the
+    // 3.7 m from the spawn to the wall.
     let mut last = CharacterMove::default();
-    for _ in 0..60 {
+    let mut mid_course_y = 0.0f32;
+    for step in 0..120 {
         last = world.move_character(character, Vec3::new(0.0, 0.0, 2.0 / 60.0), Vec3::Y);
-        assert!(world.body(character).unwrap().position.is_finite());
+        let position = world.body(character).unwrap().position;
+        assert!(position.is_finite());
+        if step == 60 {
+            // Half way: the kerb has been climbed and the walk continues.
+            assert!(
+                position.z > 1.5,
+                "climbed the kerb and kept going: z = {}",
+                position.z
+            );
+            mid_course_y = position.y;
+        }
     }
-    // 2 m of travel, the 0.3 m kerb climbed, then stopped by the wall at z = 4.
     let position = world.body(character).unwrap().position;
-    assert!(position.z > 2.0, "climbed the kerb and kept going: z = {}", position.z);
-    assert!((position.y - (0.3 + 0.8)).abs() < 0.05, "standing on the kerb: y = {}", position.y);
-    assert!((position.z - (4.0 - 0.3)).abs() < 0.05, "stopped at the wall: z = {}", position.z);
+    assert!(
+        (mid_course_y - (0.3 + 0.8)).abs() < 0.05,
+        "standing on the kerb mid-course: y = {mid_course_y}"
+    );
+    assert!(
+        (position.y - (0.3 + 0.8)).abs() < 0.05,
+        "still on the kerb: y = {}",
+        position.y
+    );
+    assert!(
+        (position.z - (4.0 - 0.3)).abs() < 0.02,
+        "stopped at the wall: z = {}",
+        position.z
+    );
+    assert!(last.hit_wall, "the wall reports a hit");
     assert!(last.grounded);
 }
 
@@ -751,21 +928,28 @@ fn queries_inside_a_sensor_and_through_it() {
         42,
     );
     let trigger = world.insert(
-        BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(1.0) })
-            .at(Vec3::new(0.0, 1.0, 4.0))
-            .as_sensor(),
+        BodyDesc::static_body(ColliderShape::Box {
+            half_extents: Vec3::splat(1.0),
+        })
+        .at(Vec3::new(0.0, 1.0, 4.0))
+        .as_sensor(),
     );
     let eye = Vec3::new(0.0, 1.0, 0.0);
 
     // A line-of-sight ray ignores the trigger and stops at the wall.
-    let hit = world.raycast(&Ray::new(eye, Vec3::Z), QueryFilter::default()).unwrap();
+    let hit = world
+        .raycast(&Ray::new(eye, Vec3::Z), QueryFilter::default())
+        .unwrap();
     assert_eq!(hit.body, wall);
     assert!((hit.distance - 4.0).abs() < 1e-3);
     assert_eq!(hit.user_data, 42);
 
     // With sensors enabled the trigger is nearer and wins.
     let hit = world
-        .raycast(&Ray::new(eye, Vec3::Z), QueryFilter::default().with_sensors(true))
+        .raycast(
+            &Ray::new(eye, Vec3::Z),
+            QueryFilter::default().with_sensors(true),
+        )
         .unwrap();
     assert_eq!(hit.body, trigger);
 

@@ -23,7 +23,7 @@
 //! body's displacement for the step (`velocity * last_step_delta`), which is
 //! what makes a kinematic platform carry the player.
 
-use noxel_core::math::{Ray, Vec3, to_radians};
+use noxel_core::math::{Quat, Ray, Vec3, to_radians};
 
 use crate::body::{BodyHandle, LAYER_ALL};
 use crate::query::QueryFilter;
@@ -72,13 +72,21 @@ pub struct CharacterMove {
     pub hit_count: u32,
 }
 
+/// Everything a sweep needs to know about the character being moved.
+#[derive(Clone, Copy, Debug)]
+struct Mover {
+    shape: ColliderShape,
+    rotation: Quat,
+    up: Vec3,
+    filter: QueryFilter,
+}
+
 /// Result of the horizontal sliding phase.
 #[derive(Clone, Copy, Debug)]
 struct SlideOutcome {
     position: Vec3,
     hits: u32,
     blocked: bool,
-    wall_normal: Vec3,
 }
 
 /// Result of a successful step-up attempt.
@@ -117,8 +125,18 @@ impl PhysicsWorld {
             include_static: true,
         };
 
-        let up = up.try_normalize().unwrap_or(Vec3::Y);
-        let motion = if desired_motion.is_finite() { desired_motion } else { Vec3::ZERO };
+        let mover = Mover {
+            shape,
+            rotation,
+            up: up.try_normalize().unwrap_or(Vec3::Y),
+            filter,
+        };
+        let up = mover.up;
+        let motion = if desired_motion.is_finite() {
+            desired_motion
+        } else {
+            Vec3::ZERO
+        };
 
         // Carry: a character standing on a moving platform inherits the
         // platform's displacement for the step.
@@ -158,27 +176,27 @@ impl PhysicsWorld {
         // --- 2. across --------------------------------------------------
         let horizontal = desired - up * vertical;
         if horizontal.length_squared() > 1e-12 {
-            let direct = self.slide_move(&shape, rotation, position, horizontal, up, &filter);
+            let direct = self.slide_move(&mover, position, horizontal);
             let mut chosen = direct;
             let mut stepped_ground = None;
             if direct.blocked && (was_grounded || vertical <= 0.0) {
-                if let Some(step) =
-                    self.try_step_up(&shape, rotation, position, horizontal, up, &filter, &direct)
-                {
+                if let Some(step) = self.try_step_up(&mover, position, horizontal, &direct) {
                     chosen = step.outcome;
                     stepped_ground = Some((step.ground, step.normal));
                 }
             }
             position = chosen.position;
             hit_count += chosen.hits;
-            if chosen.blocked {
-                hit_wall = true;
-                let _ = chosen.wall_normal;
-            }
+            hit_wall |= chosen.blocked;
             if let Some((ground, normal)) = stepped_ground {
-                grounded = true;
+                // The step counts as ground only on a walkable surface; a
+                // capsule balanced on the corner of a step is mid-climb, and
+                // the downward phase below decides whether it is grounded.
                 ground_normal = normal;
-                ground_body = Some(ground);
+                if is_walkable(normal, up) {
+                    grounded = true;
+                    ground_body = Some(ground);
+                }
             }
         }
 
@@ -188,7 +206,11 @@ impl PhysicsWorld {
         // it glued to floors, stairs and slopes, and lets a freshly spawned
         // character report `grounded` without a separate settling frame. A
         // jumping character is never pulled back down.
-        let snap = if vertical <= 0.0 { GROUND_SNAP_DISTANCE } else { 0.0 };
+        let snap = if vertical <= 0.0 {
+            GROUND_SNAP_DISTANCE
+        } else {
+            0.0
+        };
         let cast = down + snap;
         if cast > 0.0 {
             match self.sweep_shape(&shape, position, rotation, -up, cast, &filter) {
@@ -225,7 +247,11 @@ impl PhysicsWorld {
         self.set_character_ground(handle, ground_body);
         let translation = position - start;
         let dt = self.last_step_delta();
-        let velocity = if dt > 0.0 { translation / dt } else { Vec3::ZERO };
+        let velocity = if dt > 0.0 {
+            translation / dt
+        } else {
+            Vec3::ZERO
+        };
         CharacterMove {
             translation,
             velocity,
@@ -243,43 +269,42 @@ impl PhysicsWorld {
     /// This is the "is the character supported?" question asked with a ray
     /// instead of the collider, so a capsule balanced on the corner of a step
     /// still counts as supported while a ramp does not.
-    fn probe_walkable_ground(
-        &self,
-        shape: &ColliderShape,
-        position: Vec3,
-        up: Vec3,
-        filter: &QueryFilter,
-    ) -> bool {
+    fn probe_walkable_ground(&self, mover: &Mover, position: Vec3) -> bool {
+        let Mover {
+            shape, up, filter, ..
+        } = *mover;
         let reach = shape.bounding_radius() + STEP_HEIGHT + 0.1;
-        let ray = Ray { origin: position, dir: -up, max_t: reach };
-        match self.raycast(&ray, *filter) {
+        let ray = Ray {
+            origin: position,
+            dir: -up,
+            max_t: reach,
+        };
+        match self.raycast(&ray, filter) {
             Some(hit) => is_walkable(hit.normal, up),
             None => false,
         }
     }
 
     /// Sweeps `motion` and slides along whatever it hits.
-    fn slide_move(
-        &self,
-        shape: &ColliderShape,
-        rotation: noxel_core::math::Quat,
-        start: Vec3,
-        motion: Vec3,
-        up: Vec3,
-        filter: &QueryFilter,
-    ) -> SlideOutcome {
+    fn slide_move(&self, mover: &Mover, start: Vec3, motion: Vec3) -> SlideOutcome {
+        let Mover {
+            shape,
+            rotation,
+            up,
+            filter,
+        } = *mover;
         let mut position = start;
         let mut remaining = motion;
         let mut hits = 0u32;
         let mut blocked = false;
-        let mut wall_normal = up;
         for _ in 0..MAX_SLIDES {
             let length = remaining.length();
             if length <= 1e-6 {
                 break;
             }
             let dir = remaining / length;
-            let Some(hit) = self.sweep_shape(shape, position, rotation, dir, length, filter) else {
+            let Some(hit) = self.sweep_shape(&shape, position, rotation, dir, length, &filter)
+            else {
                 // Path is clear for the rest of the motion.
                 position += remaining;
                 break;
@@ -287,10 +312,7 @@ impl PhysicsWorld {
             position += dir * hit.distance;
             hits += 1;
             let walkable = is_walkable(hit.normal, up);
-            if !walkable {
-                blocked = true;
-                wall_normal = hit.normal;
-            }
+            blocked |= !walkable;
             // A walkable surface slides along its true normal, which lifts the
             // character up a ramp. A too-steep surface only cancels the
             // horizontal component, so it cannot be climbed.
@@ -298,33 +320,54 @@ impl PhysicsWorld {
                 hit.normal
             } else {
                 let flat = hit.normal - up * hit.normal.dot(up);
-                if flat.length_squared() > 1e-8 { flat.normalize_or_zero() } else { hit.normal }
+                if flat.length_squared() > 1e-8 {
+                    flat.normalize_or_zero()
+                } else {
+                    hit.normal
+                }
             };
             remaining -= plane_normal * remaining.dot(plane_normal);
         }
-        SlideOutcome { position, hits, blocked, wall_normal }
+        SlideOutcome {
+            position,
+            hits,
+            blocked,
+        }
     }
 
     /// Retries a blocked horizontal move from one step higher.
     fn try_step_up(
         &self,
-        shape: &ColliderShape,
-        rotation: noxel_core::math::Quat,
+        mover: &Mover,
         position: Vec3,
         motion: Vec3,
-        up: Vec3,
-        filter: &QueryFilter,
         direct: &SlideOutcome,
     ) -> Option<StepOutcome> {
+        let Mover {
+            shape,
+            rotation,
+            up,
+            filter,
+        } = *mover;
         // Head-room: refuse to step if the ceiling is closer than the step.
-        if self.sweep_shape(shape, position, rotation, up, STEP_HEIGHT, filter).is_some() {
+        if self
+            .sweep_shape(&shape, position, rotation, up, STEP_HEIGHT, &filter)
+            .is_some()
+        {
             return None;
         }
         let raised = position + up * STEP_HEIGHT;
-        let stepped = self.slide_move(shape, rotation, raised, motion, up, filter);
+        let stepped = self.slide_move(mover, raised, motion);
         // Drop back down. If there is no ground within one step the raised move
         // was a ledge, not a step, so the direct move stands.
-        let landed = self.sweep_shape(shape, stepped.position, rotation, -up, STEP_HEIGHT, filter)?;
+        let landed = self.sweep_shape(
+            &shape,
+            stepped.position,
+            rotation,
+            -up,
+            STEP_HEIGHT,
+            &filter,
+        )?;
         let landing = stepped.position - up * landed.distance;
         // The drop usually lands on the step's *top face*, which is walkable.
         // When the frame's motion is small the capsule instead catches the
@@ -333,9 +376,7 @@ impl PhysicsWorld {
         // centre finds walkable ground below it. A ramp fails that probe (the
         // ray hits the ramp itself), which is what keeps the slope limit
         // meaningful.
-        if !is_walkable(landed.normal, up)
-            && !self.probe_walkable_ground(shape, landing, up, filter)
-        {
+        if !is_walkable(landed.normal, up) && !self.probe_walkable_ground(mover, landing) {
             return None;
         }
         let dir = motion.normalize_or_zero();
@@ -349,7 +390,6 @@ impl PhysicsWorld {
                 position: landing,
                 hits: stepped.hits + 1,
                 blocked: stepped.blocked,
-                wall_normal: stepped.wall_normal,
             },
             ground: landed.body,
             normal: landed.normal,
@@ -374,9 +414,12 @@ mod tests {
     /// its feet are 0.8 below its centre.
     fn spawn_character(world: &mut PhysicsWorld, feet_y: f32) -> BodyHandle {
         world.insert(
-            BodyDesc::kinematic(ColliderShape::Capsule { radius: 0.3, half_height: 0.5 })
-                .at(Vec3::new(0.0, feet_y + 0.8, 0.0))
-                .with_layer(crate::body::LAYER_PLAYER, LAYER_ALL),
+            BodyDesc::kinematic(ColliderShape::Capsule {
+                radius: 0.3,
+                half_height: 0.5,
+            })
+            .at(Vec3::new(0.0, feet_y + 0.8, 0.0))
+            .with_layer(crate::body::LAYER_PLAYER, LAYER_ALL),
         )
     }
 
@@ -403,7 +446,11 @@ mod tests {
         // Walk diagonally at the wall: +Z is into it, +X slides along it.
         let moved = world.move_character(character, Vec3::new(2.0, 0.0, 1.0), Vec3::Y);
         assert!(moved.hit_wall);
-        assert!(moved.translation.x > 1.9, "slides along X: {}", moved.translation.x);
+        assert!(
+            moved.translation.x > 1.9,
+            "slides along X: {}",
+            moved.translation.x
+        );
         let z = world.body(character).unwrap().position.z;
         let radius = 0.3;
         assert!(
@@ -432,7 +479,11 @@ mod tests {
             "feet on the 0.25 m kerb, centre y = {}",
             position.y
         );
-        assert!(position.z > 1.0, "kept walking onto the kerb: z = {}", position.z);
+        assert!(
+            position.z > 1.0,
+            "kept walking onto the kerb: z = {}",
+            position.z
+        );
     }
 
     #[test]
@@ -493,8 +544,16 @@ mod tests {
         // Walk forward over the lip with no downward motion of our own.
         let moved = world.move_character(character, Vec3::new(0.0, 0.0, 1.0), Vec3::Y);
         assert!(moved.grounded, "the snap finds the lower platform");
-        assert!((moved.translation.y + 0.15).abs() < 0.02, "{:?}", moved.translation);
-        assert!((moved.translation.z - 1.0).abs() < 1e-3, "{:?}", moved.translation);
+        assert!(
+            (moved.translation.y + 0.15).abs() < 0.02,
+            "{:?}",
+            moved.translation
+        );
+        assert!(
+            (moved.translation.z - 1.0).abs() < 1e-3,
+            "{:?}",
+            moved.translation
+        );
     }
 
     #[test]
@@ -516,7 +575,10 @@ mod tests {
         }
         let z = world.body(character).unwrap().position.z;
         assert!(z < 4.0, "stopped in front of the wall, z = {z}");
-        assert!((z - (4.0 - 0.3)).abs() < 0.02, "rests against the wall, z = {z}");
+        assert!(
+            (z - (4.0 - 0.3)).abs() < 0.02,
+            "rests against the wall, z = {z}"
+        );
     }
 
     #[test]
@@ -532,7 +594,10 @@ mod tests {
         let moved = world.move_character(character, Vec3::new(0.0, 1.5, 0.0), Vec3::Y);
         assert!(moved.hit_ceiling);
         let y = world.body(character).unwrap().position.y;
-        assert!(y <= 2.2 - 0.8 + 0.01, "head stops under the ceiling: y = {y}");
+        assert!(
+            y <= 2.2 - 0.8 + 0.01,
+            "head stops under the ceiling: y = {y}"
+        );
     }
 
     #[test]
@@ -562,7 +627,11 @@ mod tests {
         let character = spawn_character(&mut world, 0.0);
         // No floor at all: the character must be able to move freely.
         let moved = world.move_character(character, Vec3::new(1.0, 0.0, 0.0), Vec3::Y);
-        assert!((moved.translation.x - 1.0).abs() < 1e-4, "{:?}", moved.translation);
+        assert!(
+            (moved.translation.x - 1.0).abs() < 1e-4,
+            "{:?}",
+            moved.translation
+        );
         assert!(!moved.grounded);
     }
 
@@ -571,9 +640,11 @@ mod tests {
         let mut world = PhysicsWorld::new(PhysicsConfig::default());
         ground(&mut world);
         world.insert(
-            BodyDesc::static_body(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-                .at(Vec3::new(0.0, 0.5, 1.0))
-                .as_sensor(),
+            BodyDesc::static_body(ColliderShape::Box {
+                half_extents: Vec3::splat(0.5),
+            })
+            .at(Vec3::new(0.0, 0.5, 1.0))
+            .as_sensor(),
         );
         let character = spawn_character(&mut world, 0.0);
         world.step(1.0 / 60.0);
@@ -585,9 +656,11 @@ mod tests {
     fn kinematic_platform_carries_the_character() {
         let mut world = PhysicsWorld::new(PhysicsConfig::default());
         let platform = world.insert(
-            BodyDesc::kinematic(ColliderShape::Box { half_extents: Vec3::new(4.0, 0.5, 4.0) })
-                .at(Vec3::new(0.0, -0.5, 0.0))
-                .with_velocity(Vec3::new(2.0, 0.0, 0.0)),
+            BodyDesc::kinematic(ColliderShape::Box {
+                half_extents: Vec3::new(4.0, 0.5, 4.0),
+            })
+            .at(Vec3::new(0.0, -0.5, 0.0))
+            .with_velocity(Vec3::new(2.0, 0.0, 0.0)),
         );
         let character = spawn_character(&mut world, 0.0);
         world.step(1.0 / 60.0);
@@ -604,8 +677,12 @@ mod tests {
             "{:?}",
             moved.translation
         );
-        let dx = world.body(character).unwrap().position.x - world.body(platform).unwrap().position.x;
-        assert!(dx.abs() < 2.0 / 60.0 + 1e-3, "stays on the platform, offset {dx}");
+        let dx =
+            world.body(character).unwrap().position.x - world.body(platform).unwrap().position.x;
+        assert!(
+            dx.abs() < 2.0 / 60.0 + 1e-3,
+            "stays on the platform, offset {dx}"
+        );
     }
 
     #[test]

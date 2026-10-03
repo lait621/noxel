@@ -89,7 +89,7 @@ pub fn perlin_2d(x: f32, y: f32, seed: u64) -> f32 {
     let b = d01 + (d11 - d01) * u;
     // Perlin's theoretical range for 2D gradients is about ±0.707; scale it so
     // callers get a genuine [-1, 1].
-    (a + (b - a) * v) * 1.414_213_6
+    (a + (b - a) * v) * core::f32::consts::SQRT_2
 }
 
 /// 8 evenly spaced gradient directions; picking with a hash avoids a table.

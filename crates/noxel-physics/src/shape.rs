@@ -82,11 +82,17 @@ impl ColliderShape {
                 );
                 Aabb::from_center_half_extents(position, e)
             }
-            Self::Capsule { radius, half_height } => {
+            Self::Capsule {
+                radius,
+                half_height,
+            } => {
                 let axis = rotation.rotate_vec3(Vec3::Y) * half_height.abs();
                 Aabb::new(position - axis, position + axis).expanded(radius.abs())
             }
-            Self::Cylinder { radius, half_height } => {
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
                 // Exact extent of a cylinder along world axis `e`:
                 //   hh * |axis·e| + r * sqrt(1 - (axis·e)^2)
                 // because the circular cross-section projects to an ellipse
@@ -110,8 +116,14 @@ impl ColliderShape {
         match *self {
             Self::Box { half_extents } => half_extents.abs().length(),
             Self::Sphere { radius } => radius.abs(),
-            Self::Capsule { radius, half_height } => half_height.abs() + radius.abs(),
-            Self::Cylinder { radius, half_height } => {
+            Self::Capsule {
+                radius,
+                half_height,
+            } => half_height.abs() + radius.abs(),
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
                 (r * r + hh * hh).sqrt()
             }
@@ -131,11 +143,17 @@ impl ColliderShape {
                 let r = radius.abs();
                 4.0 / 3.0 * pi * r * r * r
             }
-            Self::Capsule { radius, half_height } => {
+            Self::Capsule {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
                 pi * r * r * 2.0 * hh + 4.0 / 3.0 * pi * r * r * r
             }
-            Self::Cylinder { radius, half_height } => {
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
                 pi * r * r * 2.0 * hh
             }
@@ -152,12 +170,18 @@ impl ColliderShape {
                 local.x.abs() <= h.x && local.y.abs() <= h.y && local.z.abs() <= h.z
             }
             Self::Sphere { radius } => local.length_squared() <= radius.abs() * radius.abs(),
-            Self::Capsule { radius, half_height } => {
+            Self::Capsule {
+                radius,
+                half_height,
+            } => {
                 let r = radius.abs();
                 let closest = closest_point_on_y_segment(local, half_height.abs());
                 (local - closest).length_squared() <= r * r
             }
-            Self::Cylinder { radius, half_height } => {
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
                 local.y.abs() <= hh && local.x * local.x + local.z * local.z <= r * r
             }
@@ -182,12 +206,26 @@ impl ColliderShape {
                 )
             }
             Self::Sphere { radius } => dir.normalize_or_zero() * radius.abs(),
-            Self::Capsule { radius, half_height } => {
-                let y = if dir.y >= 0.0 { half_height.abs() } else { -half_height.abs() };
+            Self::Capsule {
+                radius,
+                half_height,
+            } => {
+                let y = if dir.y >= 0.0 {
+                    half_height.abs()
+                } else {
+                    -half_height.abs()
+                };
                 Vec3::new(0.0, y, 0.0) + dir.normalize_or_zero() * radius.abs()
             }
-            Self::Cylinder { radius, half_height } => {
-                let y = if dir.y >= 0.0 { half_height.abs() } else { -half_height.abs() };
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
+                let y = if dir.y >= 0.0 {
+                    half_height.abs()
+                } else {
+                    -half_height.abs()
+                };
                 let radial = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero() * radius.abs();
                 Vec3::new(0.0, y, 0.0) + radial
             }
@@ -204,9 +242,14 @@ impl ColliderShape {
     #[must_use]
     pub fn collision_shape(&self) -> Self {
         match *self {
-            Self::Cylinder { radius, half_height } => {
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
-                Self::Box { half_extents: Vec3::new(r, hh, r) }
+                Self::Box {
+                    half_extents: Vec3::new(r, hh, r),
+                }
             }
             other => other,
         }
@@ -218,12 +261,14 @@ impl ColliderShape {
         match *self {
             Self::Box { half_extents } => half_extents.abs(),
             Self::Sphere { radius } => Vec3::splat(radius.abs()),
-            Self::Capsule { radius, half_height } => {
-                Vec3::new(radius.abs(), half_height.abs() + radius.abs(), radius.abs())
-            }
-            Self::Cylinder { radius, half_height } => {
-                Vec3::new(radius.abs(), half_height.abs(), radius.abs())
-            }
+            Self::Capsule {
+                radius,
+                half_height,
+            } => Vec3::new(radius.abs(), half_height.abs() + radius.abs(), radius.abs()),
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => Vec3::new(radius.abs(), half_height.abs(), radius.abs()),
         }
     }
 
@@ -237,7 +282,10 @@ impl ColliderShape {
         match *self {
             Self::Sphere { radius } => raycast_sphere(origin, dir, radius.abs(), max_t),
             Self::Box { half_extents } => raycast_box(origin, dir, half_extents.abs(), max_t),
-            Self::Capsule { radius, half_height } => {
+            Self::Capsule {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
                 // A capsule is the union of a cylinder body and two end spheres,
                 // so the entry point is the smallest valid hit of those three.
@@ -262,10 +310,13 @@ impl ColliderShape {
                 }
                 best
             }
-            Self::Cylinder { radius, half_height } => {
+            Self::Cylinder {
+                radius,
+                half_height,
+            } => {
                 let (r, hh) = (radius.abs(), half_height.abs());
-                let inside = origin.y.abs() <= hh
-                    && origin.x * origin.x + origin.z * origin.z <= r * r;
+                let inside =
+                    origin.y.abs() <= hh && origin.x * origin.x + origin.z * origin.z <= r * r;
                 if inside {
                     return Some((0.0, -dir));
                 }
@@ -285,7 +336,6 @@ impl ColliderShape {
             }
         }
     }
-
 }
 
 /// The point on the segment `(0, -hh, 0)..(0, +hh, 0)` closest to `p`.
@@ -395,7 +445,9 @@ mod tests {
 
     #[test]
     fn box_aabb_is_tight_when_axis_aligned() {
-        let s = ColliderShape::Box { half_extents: Vec3::new(1.0, 2.0, 3.0) };
+        let s = ColliderShape::Box {
+            half_extents: Vec3::new(1.0, 2.0, 3.0),
+        };
         let b = s.aabb(Vec3::new(1.0, 0.0, 0.0), Quat::IDENTITY);
         assert!((b.min - Vec3::new(0.0, -2.0, -3.0)).length() < EPS);
         assert!((b.max - Vec3::new(2.0, 2.0, 3.0)).length() < EPS);
@@ -405,8 +457,13 @@ mod tests {
     fn box_aabb_grows_with_yaw() {
         // A 1x1x1 box yawed 45 degrees has a half-diagonal footprint
         // sqrt(0.5^2 + 0.5^2) = 0.7071 on X and Z, and 0.5 on Y.
-        let s = ColliderShape::Box { half_extents: Vec3::splat(0.5) };
-        let b = s.aabb(Vec3::ZERO, Quat::from_rotation_y(core::f32::consts::FRAC_PI_4));
+        let s = ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        };
+        let b = s.aabb(
+            Vec3::ZERO,
+            Quat::from_rotation_y(core::f32::consts::FRAC_PI_4),
+        );
         let expected = (0.5f32 * 0.5 + 0.5 * 0.5).sqrt();
         assert!((b.half_extents().x - expected).abs() < EPS);
         assert!((b.half_extents().z - expected).abs() < EPS);
@@ -415,7 +472,10 @@ mod tests {
 
     #[test]
     fn capsule_aabb_includes_caps() {
-        let s = ColliderShape::Capsule { radius: 0.5, half_height: 1.0 };
+        let s = ColliderShape::Capsule {
+            radius: 0.5,
+            half_height: 1.0,
+        };
         let b = s.aabb(Vec3::ZERO, Quat::IDENTITY);
         assert!((b.half_extents().y - 1.5).abs() < EPS);
         assert!((b.half_extents().x - 0.5).abs() < EPS);
@@ -423,22 +483,48 @@ mod tests {
 
     #[test]
     fn cylinder_aabb_is_exact_on_axis() {
-        let s = ColliderShape::Cylinder { radius: 0.5, half_height: 2.0 };
-        let b = s.aabb(Vec3::ZERO, Quat::from_rotation_z(core::f32::consts::FRAC_PI_2));
+        let s = ColliderShape::Cylinder {
+            radius: 0.5,
+            half_height: 2.0,
+        };
+        let b = s.aabb(
+            Vec3::ZERO,
+            Quat::from_rotation_z(core::f32::consts::FRAC_PI_2),
+        );
         // Rotated 90 degrees about Z the axis points along -X, so the extent is
         // 2.0 on X, 0.5 on Y and 0.5 on Z.
-        assert!((b.half_extents().x - 2.0).abs() < EPS, "{:?}", b.half_extents());
-        assert!((b.half_extents().y - 0.5).abs() < EPS, "{:?}", b.half_extents());
-        assert!((b.half_extents().z - 0.5).abs() < EPS, "{:?}", b.half_extents());
+        assert!(
+            (b.half_extents().x - 2.0).abs() < EPS,
+            "{:?}",
+            b.half_extents()
+        );
+        assert!(
+            (b.half_extents().y - 0.5).abs() < EPS,
+            "{:?}",
+            b.half_extents()
+        );
+        assert!(
+            (b.half_extents().z - 0.5).abs() < EPS,
+            "{:?}",
+            b.half_extents()
+        );
     }
 
     #[test]
     fn bounding_radius_contains_shape() {
         let shapes = [
-            ColliderShape::Box { half_extents: Vec3::new(1.0, 0.5, 2.0) },
+            ColliderShape::Box {
+                half_extents: Vec3::new(1.0, 0.5, 2.0),
+            },
             ColliderShape::Sphere { radius: 1.5 },
-            ColliderShape::Capsule { radius: 0.25, half_height: 0.75 },
-            ColliderShape::Cylinder { radius: 0.4, half_height: 1.2 },
+            ColliderShape::Capsule {
+                radius: 0.25,
+                half_height: 0.75,
+            },
+            ColliderShape::Cylinder {
+                radius: 0.4,
+                half_height: 1.2,
+            },
         ];
         for s in shapes {
             let r = s.bounding_radius();
@@ -453,19 +539,29 @@ mod tests {
     #[test]
     fn volumes_match_closed_forms() {
         let pi = core::f32::consts::PI;
-        let cube = ColliderShape::Box { half_extents: Vec3::splat(0.5) };
+        let cube = ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        };
         assert!((cube.volume() - 1.0).abs() < EPS);
         let ball = ColliderShape::Sphere { radius: 1.0 };
         assert!((ball.volume() - 4.0 / 3.0 * pi).abs() < EPS);
-        let cyl = ColliderShape::Cylinder { radius: 1.0, half_height: 1.0 };
+        let cyl = ColliderShape::Cylinder {
+            radius: 1.0,
+            half_height: 1.0,
+        };
         assert!((cyl.volume() - 2.0 * pi).abs() < EPS);
-        let cap = ColliderShape::Capsule { radius: 1.0, half_height: 1.0 };
+        let cap = ColliderShape::Capsule {
+            radius: 1.0,
+            half_height: 1.0,
+        };
         assert!((cap.volume() - (2.0 * pi + 4.0 / 3.0 * pi)).abs() < EPS);
     }
 
     #[test]
     fn contains_point_matches_shape_definition() {
-        let b = ColliderShape::Box { half_extents: Vec3::splat(1.0) };
+        let b = ColliderShape::Box {
+            half_extents: Vec3::splat(1.0),
+        };
         assert!(b.contains_point(Vec3::new(1.0, -1.0, 0.0)));
         assert!(!b.contains_point(Vec3::new(1.01, 0.0, 0.0)));
 
@@ -475,13 +571,19 @@ mod tests {
 
         // Capsule: a point 0.4 off the axis is inside (r = 0.5), but a point
         // beyond the cap at y = 1.4 is outside (1.4 > 1.0 + 0.5).
-        let c = ColliderShape::Capsule { radius: 0.5, half_height: 1.0 };
+        let c = ColliderShape::Capsule {
+            radius: 0.5,
+            half_height: 1.0,
+        };
         assert!(c.contains_point(Vec3::new(0.4, 0.9, 0.0)));
         // The cap sphere reaches y = 1.0 + 0.5; 1.4 is still inside it.
         assert!(c.contains_point(Vec3::new(0.0, 1.4, 0.0)));
         assert!(!c.contains_point(Vec3::new(0.0, 1.6, 0.0)));
 
-        let cy = ColliderShape::Cylinder { radius: 0.5, half_height: 1.0 };
+        let cy = ColliderShape::Cylinder {
+            radius: 0.5,
+            half_height: 1.0,
+        };
         assert!(cy.contains_point(Vec3::new(0.4, 0.9, 0.0)));
         assert!(!cy.contains_point(Vec3::new(0.4, 0.9, 0.4)));
     }
@@ -490,10 +592,18 @@ mod tests {
     fn support_is_extremal() {
         let dir = Vec3::new(1.0, -0.5, 0.25);
         let shapes = [
-            ColliderShape::Box { half_extents: Vec3::new(1.0, 0.5, 2.0) },
+            ColliderShape::Box {
+                half_extents: Vec3::new(1.0, 0.5, 2.0),
+            },
             ColliderShape::Sphere { radius: 1.5 },
-            ColliderShape::Capsule { radius: 0.25, half_height: 0.75 },
-            ColliderShape::Cylinder { radius: 0.4, half_height: 1.2 },
+            ColliderShape::Capsule {
+                radius: 0.25,
+                half_height: 0.75,
+            },
+            ColliderShape::Cylinder {
+                radius: 0.4,
+                half_height: 1.2,
+            },
         ];
         for s in shapes {
             let p = s.support(dir);
@@ -515,7 +625,9 @@ mod tests {
     #[test]
     fn ray_hits_sphere_at_surface() {
         let s = ColliderShape::Sphere { radius: 1.0 };
-        let (t, n) = s.raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0).unwrap();
+        let (t, n) = s
+            .raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 4.0).abs() < EPS);
         assert!((n - Vec3::X).length() < EPS);
     }
@@ -523,56 +635,95 @@ mod tests {
     #[test]
     fn ray_misses_sphere() {
         let s = ColliderShape::Sphere { radius: 1.0 };
-        assert!(s.raycast_local(Vec3::new(5.0, 2.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0).is_none());
-        assert!(s.raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::X, 100.0).is_none());
+        assert!(
+            s.raycast_local(Vec3::new(5.0, 2.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0)
+                .is_none()
+        );
+        assert!(
+            s.raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::X, 100.0)
+                .is_none()
+        );
     }
 
     #[test]
     fn ray_hits_box_face_and_reports_axis_normal() {
-        let b = ColliderShape::Box { half_extents: Vec3::splat(1.0) };
-        let (t, n) = b.raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0).unwrap();
+        let b = ColliderShape::Box {
+            half_extents: Vec3::splat(1.0),
+        };
+        let (t, n) = b
+            .raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 4.0).abs() < EPS);
         assert!((n - Vec3::X).length() < EPS);
-        let (t, n) = b.raycast_local(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 100.0).unwrap();
+        let (t, n) = b
+            .raycast_local(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 4.0).abs() < EPS);
         assert!((n - Vec3::Y).length() < EPS);
-        assert!(b.raycast_local(Vec3::new(5.0, 5.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0).is_none());
+        assert!(
+            b.raycast_local(Vec3::new(5.0, 5.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0)
+                .is_none()
+        );
     }
 
     #[test]
     fn ray_hits_cylinder_side_and_cap() {
-        let c = ColliderShape::Cylinder { radius: 1.0, half_height: 1.0 };
-        let (t, n) = c.raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0).unwrap();
+        let c = ColliderShape::Cylinder {
+            radius: 1.0,
+            half_height: 1.0,
+        };
+        let (t, n) = c
+            .raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 4.0).abs() < EPS);
         assert!((n - Vec3::X).length() < EPS);
-        let (t, n) = c.raycast_local(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 100.0).unwrap();
+        let (t, n) = c
+            .raycast_local(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 4.0).abs() < EPS);
         assert!((n - Vec3::Y).length() < EPS);
     }
 
     #[test]
     fn ray_hits_capsule_side_and_cap() {
-        let c = ColliderShape::Capsule { radius: 0.5, half_height: 1.0 };
-        let (t, n) = c.raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0).unwrap();
+        let c = ColliderShape::Capsule {
+            radius: 0.5,
+            half_height: 1.0,
+        };
+        let (t, n) = c
+            .raycast_local(Vec3::new(5.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 4.5).abs() < EPS);
         assert!((n - Vec3::X).length() < EPS);
         // Straight down onto the top cap: the sphere centre sits at y = 1.0.
-        let (t, n) = c.raycast_local(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 100.0).unwrap();
+        let (t, n) = c
+            .raycast_local(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 100.0)
+            .unwrap();
         assert!((t - 3.5).abs() < EPS);
         assert!((n - Vec3::Y).length() < EPS);
     }
 
     #[test]
     fn ray_from_inside_reports_zero() {
-        let b = ColliderShape::Box { half_extents: Vec3::splat(1.0) };
+        let b = ColliderShape::Box {
+            half_extents: Vec3::splat(1.0),
+        };
         let (t, _) = b.raycast_local(Vec3::ZERO, Vec3::X, 100.0).unwrap();
         assert_eq!(t, 0.0);
     }
 
     #[test]
     fn collision_shape_maps_cylinder_to_box() {
-        let c = ColliderShape::Cylinder { radius: 0.5, half_height: 2.0 };
-        assert_eq!(c.collision_shape(), ColliderShape::Box { half_extents: Vec3::new(0.5, 2.0, 0.5) });
+        let c = ColliderShape::Cylinder {
+            radius: 0.5,
+            half_height: 2.0,
+        };
+        assert_eq!(
+            c.collision_shape(),
+            ColliderShape::Box {
+                half_extents: Vec3::new(0.5, 2.0, 0.5)
+            }
+        );
         // The box's bounding radius is its half-diagonal: sqrt(0.5^2+2^2+0.5^2).
         let expected = (0.25f32 + 4.0 + 0.25).sqrt();
         assert!((c.collision_shape().bounding_radius() - expected).abs() < 1e-5);
@@ -580,7 +731,9 @@ mod tests {
 
     #[test]
     fn negative_extents_are_treated_as_magnitudes() {
-        let b = ColliderShape::Box { half_extents: Vec3::splat(-1.0) };
+        let b = ColliderShape::Box {
+            half_extents: Vec3::splat(-1.0),
+        };
         let aabb = b.aabb(Vec3::ZERO, Quat::IDENTITY);
         assert!((aabb.max - Vec3::splat(1.0)).length() < EPS);
         assert!(b.contains_point(Vec3::new(0.5, 0.5, 0.5)));

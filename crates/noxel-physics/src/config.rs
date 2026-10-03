@@ -68,7 +68,8 @@ impl PhysicsConfig {
         if !c.gravity.is_finite() {
             c.gravity = Vec3::ZERO;
         }
-        c.broadphase_cell_size = clamp_range(c.broadphase_cell_size, 0.05, 1024.0, DEFAULT_CELL_SIZE);
+        c.broadphase_cell_size =
+            clamp_range(c.broadphase_cell_size, 0.05, 1024.0, DEFAULT_CELL_SIZE);
         c.contact_tolerance = clamp_range(c.contact_tolerance, 0.0, 0.5, 0.005);
         c.solver_iterations = c.solver_iterations.clamp(1, 64);
         c.position_correction = clamp_range(c.position_correction, 0.0, 1.0, 0.2);
@@ -82,7 +83,11 @@ impl PhysicsConfig {
 }
 
 fn clamp_range(v: f32, min: f32, max: f32, fallback: f32) -> f32 {
-    if v.is_finite() { v.clamp(min, max) } else { fallback }
+    if v.is_finite() {
+        v.clamp(min, max)
+    } else {
+        fallback
+    }
 }
 
 #[cfg(test)]

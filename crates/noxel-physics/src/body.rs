@@ -353,7 +353,11 @@ impl BodyDesc {
             friction: sanitize_unit(self.friction),
             linear_damping: sanitize_damping(self.linear_damping),
             angular_damping: sanitize_damping(self.angular_damping),
-            gravity_scale: if self.gravity_scale.is_finite() { self.gravity_scale } else { 1.0 },
+            gravity_scale: if self.gravity_scale.is_finite() {
+                self.gravity_scale
+            } else {
+                1.0
+            },
             is_sensor: self.is_sensor,
             // Only dynamic bodies sleep: static and kinematic bodies are moved
             // by their kind, not by the sleep state, and reporting them as
@@ -380,14 +384,20 @@ pub(crate) fn sanitize_shape(shape: ColliderShape) -> ColliderShape {
                 half_extents.z.abs().max(MIN),
             ),
         },
-        ColliderShape::Sphere { radius } => {
-            ColliderShape::Sphere { radius: radius.abs().max(MIN) }
-        }
-        ColliderShape::Capsule { radius, half_height } => ColliderShape::Capsule {
+        ColliderShape::Sphere { radius } => ColliderShape::Sphere {
+            radius: radius.abs().max(MIN),
+        },
+        ColliderShape::Capsule {
+            radius,
+            half_height,
+        } => ColliderShape::Capsule {
             radius: radius.abs().max(MIN),
             half_height: half_height.abs().max(0.0),
         },
-        ColliderShape::Cylinder { radius, half_height } => ColliderShape::Cylinder {
+        ColliderShape::Cylinder {
+            radius,
+            half_height,
+        } => ColliderShape::Cylinder {
             radius: radius.abs().max(MIN),
             half_height: half_height.abs().max(0.0),
         },
@@ -401,12 +411,20 @@ fn finite_or(v: Vec3, fallback: Vec3) -> Vec3 {
 
 #[inline]
 fn finite_or_quat(q: Quat) -> Quat {
-    if q.is_finite() { q.normalize() } else { Quat::IDENTITY }
+    if q.is_finite() {
+        q.normalize()
+    } else {
+        Quat::IDENTITY
+    }
 }
 
 #[inline]
 fn sanitize_unit(v: f32) -> f32 {
-    if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 }
+    if v.is_finite() {
+        v.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 #[inline]
@@ -420,7 +438,9 @@ mod tests {
 
     #[test]
     fn dynamic_body_has_inverse_mass() {
-        let b = BodyDesc::dynamic(ColliderShape::Sphere { radius: 1.0 }).with_mass(4.0).build();
+        let b = BodyDesc::dynamic(ColliderShape::Sphere { radius: 1.0 })
+            .with_mass(4.0)
+            .build();
         assert!((b.inv_mass - 0.25).abs() < 1e-6);
         assert!(b.is_dynamic());
     }
@@ -445,7 +465,10 @@ mod tests {
     #[test]
     fn default_mass_follows_volume() {
         // A 1x1x1 m box has volume 1, so its default mass is DEFAULT_DENSITY.
-        let b = BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) }).build();
+        let b = BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .build();
         assert!((b.mass - DEFAULT_DENSITY).abs() < 1e-4);
     }
 
@@ -462,7 +485,10 @@ mod tests {
             .build();
         assert!(a.can_collide_with(&b));
         assert!(b.can_collide_with(&a));
-        assert!(!a.can_collide_with(&c), "player must not collide with an NPC layer");
+        assert!(
+            !a.can_collide_with(&c),
+            "player must not collide with an NPC layer"
+        );
         assert!(!c.can_collide_with(&a));
     }
 
@@ -503,9 +529,11 @@ mod tests {
 
     #[test]
     fn aabb_tracks_position_and_rotation() {
-        let b = BodyDesc::dynamic(ColliderShape::Box { half_extents: Vec3::splat(0.5) })
-            .at(Vec3::new(0.0, 1.0, 0.0))
-            .build();
+        let b = BodyDesc::dynamic(ColliderShape::Box {
+            half_extents: Vec3::splat(0.5),
+        })
+        .at(Vec3::new(0.0, 1.0, 0.0))
+        .build();
         let aabb = b.aabb();
         assert!((aabb.center() - Vec3::new(0.0, 1.0, 0.0)).length() < 1e-5);
         assert!((aabb.half_extents() - Vec3::splat(0.5)).length() < 1e-5);
