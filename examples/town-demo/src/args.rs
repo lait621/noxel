@@ -122,7 +122,8 @@ impl Args {
 town-demo — a ready-to-run Noxel village
 
 USAGE:
-    cargo run -p town-demo -- [OPTIONS]
+    town-demo [OPTIONS]                  # after ./scripts/build-dist.sh
+    cargo run -p town-demo -- [OPTIONS]  # from the source tree
 
 OPTIONS:
     --seed N          World seed (default 0x4E4F5845)
@@ -139,9 +140,14 @@ OPTIONS:
     -h, --help        Print this text
 
 EXAMPLES:
-    cargo run -p town-demo -- --frames 300 --dump frames
-    cargo run -p town-demo -- --mode hybrid --npcs 400
-    cargo run -p town-demo -- --seed 12345 --world-info
+    town-demo --frames 300 --dump frames
+    town-demo --mode hybrid --npcs 400
+    town-demo --seed 12345 --world-info
+
+The assets are found automatically, in this order: $NOXEL_ASSET_DIR, ./assets
+beside the binary, ../examples/town-demo/assets, then ./examples/town-demo/assets
+and ./assets relative to the working directory. A missing asset tree is not
+fatal — the world falls back to procedural content.
 "
         .to_string()
     }

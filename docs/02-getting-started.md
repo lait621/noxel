@@ -22,6 +22,37 @@ engine has zero third-party dependencies (`adr/0002-no-dependencies.md`).
 
 ---
 
+## 0b. Or just run the prebuilt example
+
+If you do not have Rust, or you just want to see the engine work, build the
+relocatable example bundle on a machine that does:
+
+```bash
+./scripts/build-dist.sh
+```
+
+That produces `dist/`:
+
+```
+dist/
+  town-demo      the compiled example
+  noxel-gen      the asset generator
+  assets/        every texture, tileset, prefab and sprite it needs
+  README.txt
+```
+
+`dist/` needs no toolchain, no source tree and no network. Copy it anywhere —
+to a USB stick, to a colleague's laptop — and run `./town-demo`. The binary finds
+its assets beside itself, so the working directory does not matter.
+
+```bash
+cd dist && ./town-demo --frames 300
+```
+
+The rest of this guide is for working on the source.
+
+---
+
 ## 1. Build and test
 
 ```bash

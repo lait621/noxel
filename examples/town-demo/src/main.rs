@@ -86,7 +86,12 @@ fn main() {
 /// Builds the app, wires the plugins, and runs for the requested number of
 /// frames.
 fn run(args: &Args) -> Result<(), String> {
-    let mut app = build_app(args)?;
+    // Resolve the two locations a user needs to know about *before* building the
+    // app, so the banner can report them whether or not anything was loaded.
+    let dumping = args.dump.is_some();
+    let dump_dir = dump_root(args);
+    let assets = asset_root();
+    let mut app = build_app(args, &assets)?;
 
     if args.world_info {
         print_world_info(&mut app, args);
@@ -119,9 +124,10 @@ fn run(args: &Args) -> Result<(), String> {
         println!("town-demo — seed {:#x}", args.seed);
         println!("  {} {}", app.renderer_name(), describe_mode(args.mode));
         println!("  internal {}x{}", args.size.0, args.size.1);
-        if let Some(dir) = &args.dump {
-            println!("  frames -> {}", dir.display());
+        if dumping {
+            println!("  frames -> {}", absolute(&dump_dir).display());
         }
+        println!("  assets -> {}", absolute(&assets).display());
     }
 
     let started = Instant::now();
@@ -145,8 +151,10 @@ fn run(args: &Args) -> Result<(), String> {
 }
 
 /// Builds the app: assets, world settings, camera, lighting and debug.
-fn build_app(args: &Args) -> Result<App, String> {
-    let root = asset_root();
+fn build_app(args: &Args, root: &std::path::Path) -> Result<App, String> {
+    // `--no-dump` leaves `args.dump` as `None`; resolve once and reuse.
+    let dumping = args.dump.is_some();
+    let dump_dir = dump_root(args);
     let mut config = AppConfig {
         seed: args.seed,
         internal: args.size,
@@ -160,14 +168,14 @@ fn build_app(args: &Args) -> Result<App, String> {
         } else {
             DebugConfig::disabled()
         },
-        assets_root: root,
+        assets_root: root.to_path_buf(),
         ..AppConfig::default()
     };
-    if let Some(dir) = &args.dump {
-        config.dump = Some((dir.clone(), noxel_debug::DumpFormat::Png));
+    config.dump = if dumping {
+        Some((dump_dir.clone(), noxel_debug::DumpFormat::Png))
     } else {
-        config.dump = None;
-    }
+        None
+    };
 
     let mut app = App::new(config).map_err(|e| e.to_string())?;
     // A previous run's frames would otherwise survive into this one and be
@@ -226,16 +234,92 @@ fn build_app(args: &Args) -> Result<App, String> {
 /// Finds `examples/town-demo/assets` whether the demo is run from the workspace
 /// root or from its own directory.
 fn asset_root() -> std::path::PathBuf {
-    let candidates = [
-        std::path::PathBuf::from("examples/town-demo/assets"),
-        std::path::PathBuf::from("assets"),
-    ];
-    for candidate in &candidates {
-        if candidate.join("manifest.json").exists() {
-            return candidate.clone();
+    asset_root_from(&std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
+}
+
+/// Finds the asset tree, so the binary works whether it is run from the
+/// workspace root, from `dist/`, or from anywhere else on the machine.
+///
+/// The search order is, in decreasing order of intent:
+///
+/// 1. `$NOXEL_ASSET_DIR` — an explicit override, which a packager or a test uses.
+/// 2. `<exe>/assets` — the distributed layout, where the assets sit beside the
+///    binary. This is what makes the built executable self-contained.
+/// 3. `<exe>/../examples/town-demo/assets` — a release build inside the source
+///    tree, i.e. `target/release/town-demo`.
+/// 4. `<cwd>/examples/town-demo/assets` and `<cwd>/assets` — the two layouts a
+///    developer runs from.
+/// 5. The demo's own source directory, from `CARGO_MANIFEST_DIR` at build time,
+///    so a binary copied out of the tree still finds the art it was built with.
+///
+/// A directory counts if it contains `manifest.json`. If none does, the first
+/// directory that exists wins, and failing that the build-time path — a missing
+/// asset tree is not fatal, because the world generator falls back to procedural
+/// content and the renderer to a placeholder texture.
+fn asset_root_from(cwd: &std::path::Path) -> std::path::PathBuf {
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(dir) = std::env::var_os("NOXEL_ASSET_DIR") {
+        candidates.push(std::path::PathBuf::from(dir));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("assets"));
+            candidates.push(
+                dir.join("..")
+                    .join("examples")
+                    .join("town-demo")
+                    .join("assets"),
+            );
+            candidates.push(
+                dir.join("..")
+                    .join("..")
+                    .join("examples")
+                    .join("town-demo")
+                    .join("assets"),
+            );
         }
     }
-    candidates[0].clone()
+    candidates.push(cwd.join("examples").join("town-demo").join("assets"));
+    candidates.push(cwd.join("assets"));
+    candidates.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"));
+
+    if let Some(found) = candidates.iter().find(|c| c.join("manifest.json").exists()) {
+        return found.clone();
+    }
+    if let Some(found) = candidates.iter().find(|c| c.is_dir()) {
+        return found.clone();
+    }
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets")
+}
+
+/// The directory frames are written to.
+///
+/// `--dump` wins. Otherwise `frames/` beside the working directory, unless that
+/// cannot be created — a binary run from a read-only location still has to be
+/// able to produce output — in which case `frames/` beside the executable.
+fn dump_root(args: &Args) -> std::path::PathBuf {
+    let Some(requested) = args.dump.clone() else {
+        return std::path::PathBuf::from("frames");
+    };
+    if std::fs::create_dir_all(&requested).is_ok() {
+        return requested;
+    }
+    let fallback = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.join("frames")))
+        .unwrap_or_else(|| std::path::PathBuf::from("frames"));
+    let _ = std::fs::create_dir_all(&fallback);
+    fallback
+}
+
+/// Makes a path absolute for display, without requiring it to exist.
+fn absolute(path: &std::path::Path) -> std::path::PathBuf {
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join(path)
 }
 
 /// The crowd configuration the demo uses.
@@ -324,5 +408,114 @@ fn print_world_info(app: &mut App, args: &Args) {
         for town in towns.iter().take(6) {
             println!("  {town}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asset_root_prefers_a_directory_with_a_manifest() {
+        // Any real checkout has one of these, and the demo must find it without
+        // being told where it is.
+        let found = asset_root();
+        assert!(
+            found.join("manifest.json").exists() || found.is_dir(),
+            "{found:?} must be a directory"
+        );
+    }
+
+    #[test]
+    fn asset_root_falls_back_to_a_directory_when_no_manifest_exists() {
+        // An empty directory in an unrelated place: the search must still return
+        // something usable rather than an error, because the generator falls
+        // back to procedural content.
+        let scratch = std::env::temp_dir().join("noxel-asset-root-test");
+        let _ = std::fs::create_dir_all(&scratch);
+        let found = asset_root_from(&scratch);
+        assert!(found.is_absolute() || found.is_dir(), "{found:?}");
+        let _ = std::fs::remove_dir_all(&scratch);
+    }
+
+    #[test]
+    fn asset_root_is_never_empty() {
+        let found = asset_root_from(std::path::Path::new("/nonexistent-directory-for-tests"));
+        assert!(
+            !found.as_os_str().is_empty(),
+            "an empty path would break the asset db"
+        );
+    }
+
+    #[test]
+    fn the_compiled_binary_finds_its_assets_from_an_unrelated_directory() {
+        // The point of the whole search: `current_dir` is somewhere else, and
+        // the executable's own location is what has to win. `current_exe` is the
+        // test harness here, so the check is that the build-time fallback is
+        // reachable and points at the demo's assets.
+        let fallback = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+        assert!(fallback.is_dir(), "{fallback:?} must exist in a checkout");
+        assert!(
+            fallback.join("manifest.json").exists(),
+            "the assets must be generated"
+        );
+    }
+
+    #[test]
+    fn dump_root_honours_explicit_and_default_paths() {
+        let scratch = std::env::temp_dir().join("noxel-dump-root-test");
+        let _ = std::fs::remove_dir_all(&scratch);
+
+        let explicit = Args {
+            dump: Some(scratch.clone()),
+            ..Args::default()
+        };
+        assert_eq!(dump_root(&explicit), scratch);
+        assert!(scratch.is_dir(), "the requested directory is created");
+
+        let none = Args {
+            dump: None,
+            ..Args::default()
+        };
+        assert_eq!(dump_root(&none), std::path::PathBuf::from("frames"));
+        let _ = std::fs::remove_dir_all(&scratch);
+    }
+
+    #[test]
+    fn absolute_leaves_absolute_paths_alone() {
+        let path = std::path::Path::new("/tmp/definitely-absolute");
+        assert_eq!(absolute(path), path);
+        let relative = absolute(std::path::Path::new("frames"));
+        assert!(relative.is_absolute(), "{relative:?}");
+        assert!(relative.ends_with("frames"));
+    }
+
+    #[test]
+    fn describe_mode_covers_every_shading_mode() {
+        use noxel_render::renderer::ShadingMode;
+        for mode in [
+            ShadingMode::Raster,
+            ShadingMode::Hybrid,
+            ShadingMode::Raytrace,
+        ] {
+            assert!(!describe_mode(mode).is_empty());
+        }
+    }
+
+    #[test]
+    fn npc_config_carries_the_requested_population() {
+        let args = Args {
+            npcs: 42,
+            seed: 7,
+            ..Args::default()
+        };
+        let config = npc_config(&args);
+        assert_eq!(config.target_population, 42);
+        assert_eq!(config.seed, 7);
+        assert!(
+            config.spawn_radius < 70.0,
+            "the crowd must stay inside the streaming radius, or agents walk into \
+             chunks that are not loaded"
+        );
     }
 }

@@ -37,15 +37,26 @@ moving: top-down RPGs, colony sims, tactical games, anything with a crowd.
 
 ## Quick start
 
+**Run the prebuilt example** (no Rust toolchain needed once `dist/` is built):
+
 ```bash
-# Rust 1.85+ (edition 2024)
-git clone <this repo> && cd noxel
-cargo run -p town-demo -- --frames 600 --dump frames
+./scripts/build-dist.sh          # builds dist/town-demo + dist/noxel-gen + dist/assets
+cd dist && ./town-demo --frames 600
 ```
 
-Then open `frames/frame_000599.png`. You should see a village: a plaza, streets, a
-few dozen buildings, trees on the hills, a river, and a character walking a
-scripted route with the camera trailing behind.
+`dist/` is self-contained and relocatable: copy it anywhere and it runs. It
+contains the two binaries, the assets they need, and a `README.txt`.
+
+**Run from source** (Rust 1.85+, edition 2024):
+
+```bash
+git clone <this repo> && cd noxel
+cargo run -p town-demo -- --frames 600
+```
+
+Either way, open `frames/frame_000599.png`. You should see a village: a plaza,
+streets, a few dozen buildings, trees on the hills, a river, and a character
+walking a scripted route with the camera trailing behind.
 
 Switch renderers on the same world:
 
@@ -168,6 +179,10 @@ that shape everything else:
 ---
 
 ## Documentation
+
+English documentation is under `docs/`. A Simplified Chinese translation is
+under `docs/zh-CN/` (中文文档见 [`docs/zh-CN/`](docs/zh-CN/README.md)); the English
+version is authoritative where the two differ.
 
 | Document | Contents |
 |---|---|

@@ -17,3 +17,6 @@
 # Local scratch
 /tmp
 /scratch
+
+# Assembled runnable example from scripts/build-dist.sh
+/dist
