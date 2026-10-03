@@ -124,7 +124,11 @@ pub fn world_config(seed: u64) -> WorldConfig {
 }
 
 /// A streamer whose world configuration has been adjusted by `tweak`.
-pub fn streamer_with(seed: u64, center: Vec3, tweak: impl FnOnce(&mut WorldConfig)) -> WorldStreamer {
+pub fn streamer_with(
+    seed: u64,
+    center: Vec3,
+    tweak: impl FnOnce(&mut WorldConfig),
+) -> WorldStreamer {
     let mut config = world_config(seed);
     tweak(&mut config);
     let mut streamer = WorldStreamer::new(WorldGenerator::new(config, tile_set(), Vec::new()));

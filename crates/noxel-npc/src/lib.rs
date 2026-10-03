@@ -61,12 +61,14 @@
 //!
 //! ## Determinism
 //!
+//! [`RngStream`]: noxel_core::rng::RngStream
+//!
 //! Spawn points, kinds, schedules, destinations and path choices are all pure
 //! functions of `(seed, index)`: every draw comes from an addressable
-//! [`RngStream`](noxel_core::rng::RngStream), the crowd is stored in slot order
+//! [`RngStream`] — the crowd is stored in slot order
 //! and never iterated as a hash map, and the A\* frontier breaks ties by node
 //! coordinate. Two runs of the same seed produce bit-identical positions, which
-//! the integration tests assert over 600 steps.
+//! the crate's integration tests assert over 600 steps.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]

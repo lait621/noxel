@@ -23,6 +23,16 @@ use crate::NpcConfig;
 use crate::agent::NpcKind;
 
 /// Where a spawn point is, in the world's terms.
+///
+/// # Interiors
+///
+/// [`SpawnKind::Interior`] means "under a roof": a walkable floor inside a
+/// building's footprint. Whether such a point is *usable* depends on the
+/// buildings: the engine's generated houses are solid colliders from their base
+/// to their eaves, so [`NpcSpawner::classify`] will happily report a floor tile
+/// as `Interior` while [`NpcSpawner::choose_spawn`] refuses to place an agent
+/// inside solid geometry. A game whose prefabs have enterable interiors gets
+/// indoor spawns for free; the generated town does not have any to give.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpawnKind {
     /// Inside a town's built-up area.
@@ -52,10 +62,16 @@ impl SpawnKind {
 }
 
 /// How many sample points a single spawn attempt may try before giving up.
-const MAX_ATTEMPTS: u32 = 48;
+const MAX_ATTEMPTS: u32 = 64;
 
 /// How many extra points to try when the chosen one is inside geometry.
 const MAX_GEOMETRY_RETRIES: u32 = 4;
+
+/// How many buildings an interior search will look inside before giving up.
+const MAX_BUILDINGS_SCANNED: usize = 96;
+
+/// Grid step, in metres, for walking a building's footprint.
+const INTERIOR_STEP: f32 = 1.0;
 
 /// The chance of preferring each place, in [`SpawnKind::ALL`] order.
 ///
@@ -94,6 +110,9 @@ impl NpcSpawner {
     /// `(seed, index)`: the same index always produces the same point, so a
     /// crowd can be rebuilt identically after a load.
     ///
+    /// The point is always in a resident chunk, on a walkable tile, and clear
+    /// of props and walls — an agent is never spawned inside geometry.
+    ///
     /// Returns `None` when nothing usable could be found — no resident chunk,
     /// no walkable ground, or a crowd centre outside the streamed world.
     pub fn choose_spawn(
@@ -113,11 +132,29 @@ impl NpcSpawner {
             70.0
         } * 0.9;
         let preferred = preferred_place(&mut rng);
+        if preferred == SpawnKind::Interior
+            && let Some(inside) = find_interior(streamer, center, radius)
+        {
+            return Some((Self::kind_for(streamer, inside, index), inside));
+        }
         let mut fallback: Option<(NpcKind, Vec3)> = None;
         let mut geometry_retries = 0;
-        for _ in 0..MAX_ATTEMPTS {
+        for attempt in 0..MAX_ATTEMPTS {
+            // Sample where the preferred place actually is: someone looking for
+            // an indoor spawn should not spend every attempt in open country
+            // sixty metres from the nearest roof. After half the attempts the
+            // whole ring is fair game again, so nothing becomes unreachable.
+            let (inner, outer) = if attempt * 2 > MAX_ATTEMPTS {
+                (0.05, 1.0)
+            } else {
+                match preferred {
+                    SpawnKind::Interior | SpawnKind::Town => (0.05, 0.5),
+                    SpawnKind::Road => (0.15, 1.0),
+                    SpawnKind::Wilderness => (0.35, 1.0),
+                }
+            };
             let angle = rng.range_f32(0.0, core::f32::consts::TAU);
-            let distance = radius * rng.range_f32(0.15, 1.0).sqrt();
+            let distance = radius * rng.range_f32(inner, outer).sqrt();
             let candidate = Vec3::new(
                 center.x + angle.cos() * distance,
                 0.0,
@@ -254,6 +291,59 @@ impl NpcSpawner {
         }
         None
     }
+}
+
+/// Finds a standable spot under a roof within `radius` of `center`.
+///
+/// Sampling the ring at random almost never lands on a building's floor — a
+/// town's houses cover a few percent of its area — so an interior spawn is
+/// *looked for* rather than hoped for: the loaded chunks are visited in their
+/// sorted order and each building's footprint is walked on a one-metre grid.
+/// The scan stops at the first usable spot, and the whole path is deterministic.
+fn find_interior(streamer: &WorldStreamer, center: Vec3, radius: f32) -> Option<Vec3> {
+    let mut visited = 0usize;
+    for pos in streamer.loaded_positions() {
+        let Some(chunk) = streamer.chunk(pos) else {
+            continue;
+        };
+        for building in &chunk.buildings {
+            visited += 1;
+            if visited > MAX_BUILDINGS_SCANNED {
+                return None;
+            }
+            let bounds = building.bounds;
+            let x0 = bounds.min.x + 0.5;
+            let z0 = bounds.min.z + 0.5;
+            let mut z = z0;
+            while z < bounds.max.z {
+                let mut x = x0;
+                while x < bounds.max.x {
+                    let candidate = Vec3::new(x, 0.0, z);
+                    x += INTERIOR_STEP;
+                    if ground_distance(candidate, center) > radius {
+                        continue;
+                    }
+                    if let Some(point) = usable_point(streamer, candidate)
+                        && !blocked_by_geometry(streamer, point)
+                    {
+                        return Some(point);
+                    }
+                }
+                z += INTERIOR_STEP;
+            }
+        }
+    }
+    None
+}
+
+/// Ground-plane distance between two positions, or [`f32::MAX`] for junk.
+fn ground_distance(a: Vec3, b: Vec3) -> f32 {
+    if !a.is_finite() || !b.is_finite() {
+        return f32::MAX;
+    }
+    let dx = b.x - a.x;
+    let dz = b.z - a.z;
+    (dx * dx + dz * dz).sqrt()
 }
 
 /// Picks a preferred place from [`PLACE_WEIGHTS`].

@@ -52,7 +52,10 @@ fn choose_spawn_is_deterministic() {
             })
             .collect()
     };
-    assert_eq!(first, second, "spawns must be a pure function of (seed, index)");
+    assert_eq!(
+        first, second,
+        "spawns must be a pure function of (seed, index)"
+    );
     assert!(first.iter().filter(|entry| entry.is_some()).count() > 190);
 }
 
@@ -106,7 +109,58 @@ fn choose_spawn_returns_standable_ground() {
         }
     }
     assert!(checked >= 450, "only {checked} of 500 samples spawned");
-    assert!(interior > 0, "a town should have indoor spawns");
+    // Building interiors are solid in this engine (one collider from the base
+    // to the eaves), so a spawn under a roof would be a spawn inside a wall.
+    // `classify` still reports them; `choose_spawn` must not use them.
+    assert_eq!(interior, 0, "an agent was spawned inside a solid building");
+    assert!(
+        !interiors_are_solid(&streamer, centre),
+        "buildings became enterable: interior spawns must work now"
+    );
+}
+
+/// True when every walkable spot strictly inside a building is solid.
+///
+/// A generated house is one collider from its base to its eaves, so its floor
+/// tiles are inside a wall. The check reads the building's own occluder boxes
+/// rather than calling `colliders_in`, which would rescan every loaded chunk
+/// for every sample.
+fn interiors_are_solid(streamer: &noxel_world::WorldStreamer, centre: Vec3) -> bool {
+    let inset = 0.6;
+    for pos in streamer.loaded_positions() {
+        let Some(chunk) = streamer.chunk(pos) else {
+            continue;
+        };
+        for building in &chunk.buildings {
+            let bounds = building.bounds;
+            let mut z = bounds.min.z + inset;
+            while z < bounds.max.z - inset {
+                let mut x = bounds.min.x + inset;
+                while x < bounds.max.x - inset {
+                    let candidate = Vec3::new(x, 0.0, z);
+                    x += 1.0;
+                    let dx = candidate.x - centre.x;
+                    let dz = candidate.z - centre.z;
+                    if (dx * dx + dz * dz).sqrt() > 70.0 {
+                        continue;
+                    }
+                    let Some(ground) = ground_at(streamer, candidate) else {
+                        continue;
+                    };
+                    let head = ground + Vec3::Y * 0.9;
+                    if !building
+                        .occluders
+                        .iter()
+                        .any(|box_| box_.contains_point(head))
+                    {
+                        return false;
+                    }
+                }
+                z += 1.0;
+            }
+        }
+    }
+    true
 }
 
 /// True when `p` lies under a building's roof.
@@ -132,6 +186,17 @@ fn every_spawn_kind_appears_over_500_samples() {
         }
     }
     for (slot, count) in counts.iter().enumerate() {
+        if SpawnKind::ALL[slot] == SpawnKind::Interior {
+            // The generated town's houses are solid boxes: there is no indoor
+            // ground an agent could stand on, so an interior spawn must never
+            // appear. (The check below fails loudly if that ever changes.)
+            assert_eq!(*count, 0, "an agent spawned inside a building");
+            assert!(
+                !interiors_are_solid(&streamer, centre),
+                "buildings became enterable: interior spawns must work now"
+            );
+            continue;
+        }
         assert!(
             *count > 0,
             "{} never appeared in 500 samples: {counts:?}",

@@ -453,6 +453,38 @@ fn a_destination_inside_a_wall_is_survivable() {
 }
 
 #[test]
+fn an_agent_with_no_path_keeps_its_dignity() {
+    let (mut system, streamer, mut physics, center) = setup(29, 30, 64);
+    let mut ctx = context(&streamer, &mut physics, center, 1.0 / 60.0);
+    fill(&mut system, &mut ctx, 20);
+    let id = system.crowd().ids().next().expect("an agent");
+    // Somewhere the pathfinder refuses: far outside the streamed world.
+    assert!(system.send_to(id, center + Vec3::new(20_000.0, 0.0, 20_000.0)));
+    for _ in 0..60 {
+        ctx.world_time += 1.0 / 60.0;
+        system.update(&mut ctx);
+    }
+    let agent = system.crowd().agent(id).expect("the agent");
+    assert!(agent.position.is_finite());
+    assert!(agent.velocity.is_finite());
+    assert!(
+        agent.destination.is_some(),
+        "the request is still on record"
+    );
+    // And a crowd whose world has nothing loaded simply does not spawn.
+    let empty = common::streamer(5);
+    let mut bare = common::physics();
+    let mut ctx = NpcContext::new(&empty, &mut bare, center, 0.0, 1.0 / 60.0);
+    let mut system = NpcSystem::new(NpcConfig {
+        seed: 5,
+        target_population: 50,
+        ..NpcConfig::default()
+    });
+    let stats = system.update(&mut ctx);
+    assert_eq!(stats.active, 0, "nowhere to spawn is not a panic");
+}
+
+#[test]
 fn dt_zero_does_nothing_and_a_huge_dt_does_not_teleport() {
     let (mut system, streamer, mut physics, center) = setup(15, 60, 4096);
     let mut ctx = context(&streamer, &mut physics, center, 0.0);
