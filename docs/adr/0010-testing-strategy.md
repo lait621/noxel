@@ -64,7 +64,7 @@ Four categories, in increasing order of value:
 
 ## Consequences
 
-- The suite is large — 1475 tests — and runs in a few seconds, because the
+- The suite is large — 1483 tests — and runs in a few seconds, because the
   engine has no dependencies and no I/O in the hot path.
 - A change that breaks an invariant is caught before it reaches a commit.
 - The tests are documentation: `Storage::remove`'s comment about `swap_remove`

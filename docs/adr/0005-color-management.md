@@ -31,10 +31,11 @@ author -> Color8 (sRGB bytes)
 The round trip is **exact**: `Color8 -> linear -> sRGB -> Color8` returns the same
 bytes for every representable value. Three tests guarantee it:
 
-- `unlit_surface_round_trips_its_colour` in both renderers.
+- `unlit_surface_round_trips_its_colour` in the ray tracer and
+  `unlit_sprite_round_trips_to_the_authored_palette` in the rasterizer.
 - `palette_round_trips_exactly`, which walks 32 palette entries through the whole
   pipeline.
-- `overlay_text_is_exactly_the_requested_colour`.
+- `text_is_exactly_the_requested_colour`.
 
 `Framebuffer::resolve` offers three tone curves — `None` (the raster default, so
 the round trip is exact), `Reinhard` and `Aces` — plus exposure, dithering and

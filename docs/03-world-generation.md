@@ -129,12 +129,15 @@ let centre = town_centre(&config, cell); // y is 0; fill it from the height fiel
 `TownStyle` is drawn with fixed weights (hamlet 0.30, village 0.35, town 0.20,
 crossroads 0.15) and scales the piece count, streets and plot spacing:
 
-| Style | `building_scale` | `side_streets` | Plot gap (tiles) |
-|---|---|---|---|
-| `Hamlet` | 0.4 | 0 | 1.60 |
-| `Village` | 0.7 | 1 | 0.83 |
-| `Town` | 1.0 | 3 | 0.40 |
-| `Crossroads` | 0.85 | 1 | 0.61 |
+| Style | `building_density` | `building_scale` | `side_streets` | Plot gap (tiles) |
+|---|---|---|---|---|
+| `Hamlet` | 0.35 | 0.4 | 0 | 1.44 |
+| `Village` | 0.55 | 0.7 | 1 | 1.12 |
+| `Town` | 0.80 | 1.0 | 3 | 0.72 |
+| `Crossroads` | 0.65 | 0.85 | 1 | 0.96 |
+
+The gap is `lerp_f32(2.0, 0.4, building_density())`: a hamlet leaves nearly two
+tiles of garden between plots, a town almost touches.
 
 `TownPlan::generate` lays out a main cross through the plaza, `side_streets`
 streets per axis (trimmed to the disc by `sqrt(r² - offset²)`), a connector

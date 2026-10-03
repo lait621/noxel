@@ -28,7 +28,10 @@ tracing" and "high performance" — both point at one eventually.
   instance-buffer write; `Mat4` is column-major so it uploads without a
   transpose; clip depth is `[0, 1]` so it matches WebGPU and Vulkan directly
   (ADR 0001).
-- `Cargo.toml` carries the feature:
+- The feature would be declared as below. **No `[features]` table exists in the
+  workspace today** — this is the shape the implementation will take, not a
+  description of the current tree, and adding `wgpu` would be the first
+  third-party dependency the project has ever had:
 
 ```toml
 [features]

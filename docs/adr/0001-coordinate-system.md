@@ -46,12 +46,12 @@ is easy to place in the wrong stage.
 **Yaw of 0 looking along `-Z`** is the only convention consistent with
 `Vec3::from_yaw`. `Quat::to_yaw` therefore extracts
 `wrap_angle((-forward.x).atan2(-forward.z))`, and this sign has been wrong twice
-during development — the test `quat_yaw_round_trips` exists because of that.
+during development — the test `to_yaw_roundtrips` exists because of that.
 
 ## Consequences
 
 - A top-down camera looks along `-Y` with `up = -Z` (`CameraView::orthographic`
-  with `up_hint = Vec3::Z`), which is why `noxel-camera` derives the screen-up
+  with a world-up hint), which is why `noxel-camera` derives the screen-up
   vector from the yaw when the pitch approaches `PI/2`: at exactly straight down
   the world up vector is parallel to the view direction and `look_at_rh` cannot
   build a basis from it.

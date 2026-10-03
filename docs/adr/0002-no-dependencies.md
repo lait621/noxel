@@ -47,7 +47,7 @@ Real work, done once, in-tree:
 
 | Normally a crate | Here |
 |---|---|
-| `png` / `image` | `noxel-asset::png`, `noxel-asset::image` (1782 + 840 lines) |
+| `png` / `image` | `noxel-asset::png`, `noxel-asset::image` (1996 + 883 lines) |
 | `serde_json` | `noxel-asset::json`, an insertion-ordered parser with line/column errors |
 | `glam` | `noxel-core::math` |
 | `rand` / `fastrand` | `noxel-core::rng` (PCG32 + addressable streams) |

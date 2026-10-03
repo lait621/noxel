@@ -4,13 +4,11 @@ A complete Noxel game loop in six source files: generate a world from a seed,
 grow a village in it, drop a player into the plaza, fill the streets with a
 crowd, follow the player with a top-down camera, and write every frame as a PNG.
 
-> **Status.** The binary builds: `cargo check -p town-demo` succeeds (with
-> warnings, including an unused `prop_bounds` in `src/village.rs`).
-> `cargo test -p town-demo` does **not** — the demo's own test target has two
-> errors from `Handle::<Instance>::default()` in `src/actors.rs` (lines 474 and
-> 494), a trait implementation the engine's `Handle` does not provide. The HUD
-> overlay is also not wired: `hud::draw` exists but `main.rs` only calls
-> `hud::final_report`.
+> **Status.** Everything below is wired and green: `cargo test -p town-demo`
+> passes 56 tests, `cargo clippy -p town-demo --all-targets -- -D warnings` is
+> clean, and `./scripts/build-dist.sh` produces a relocatable `dist/` that runs
+> with no source tree and no toolchain. See "Known gaps" at the end for what is
+> deliberately absent.
 
 ## What it demonstrates
 
@@ -57,7 +55,7 @@ cargo run -p town-demo -- --help
 Run it from the repository root: the demo looks for `examples/town-demo/assets`
 first and `assets/` second. That tree **exists** and is generated — do not
 hand-edit it. It ships a 24-colour palette, four textures (terrain, buildings,
-characters, props), ten prefabs (`house_small`, `house_large`, `inn`, `barn`,
+characters, props), twelve prefabs (`house_small`, `house_large`, `inn`, `barn`,
 `shop`, `market_stall`, `well`, `lamp`, `tree_oak`, `tree_pine`, `fence_segment`,
 `rock_cluster`), a tile set and `world/demo.json`:
 

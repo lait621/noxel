@@ -181,8 +181,8 @@ that shape everything else:
 ## Documentation
 
 English documentation is under `docs/`. A Simplified Chinese translation is
-under `docs/zh-CN/` (中文文档见 [`docs/zh-CN/`](docs/zh-CN/README.md)); the English
-version is authoritative where the two differ.
+under `docs/zh-CN/` — start at [`docs/zh-CN/文档索引.md`](docs/zh-CN/文档索引.md)
+(中文文档索引). The English version is authoritative where the two differ.
 
 | Document | Contents |
 |---|---|

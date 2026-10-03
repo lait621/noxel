@@ -248,11 +248,12 @@ let _ = (exact, graded);
 `resolve_palette(&settings, &palette)` is the same resolve with every pixel
 snapped to the nearest palette entry, in sRGB (where the artist chose it).
 
-**Watch the tone-curve plumbing.** `RenderSettings::resolve()` picks `Aces` when
-*its own* `mode` field is `Raytrace`, and `App::resolve()` calls
-`self.config.render.resolve()`. `AppConfig::with_mode()` sets `config.mode`, not
-`config.render.mode` — set both, or a ray-traced frame is traced in HDR and then
-clamped by `ToneMap::None`.
+**The tone curve follows the renderer, automatically.** `RenderSettings::resolve()`
+picks `Aces` when its `mode` field is `Raytrace`, and `App::resolve()` derives the
+mode from `config.mode` — the mode the frame was actually rendered with — rather
+than trusting whatever `config.render.mode` happens to hold. Switching renderers
+with `AppConfig::with_mode()` is therefore enough on its own: a ray-traced frame
+resolves with a curve, and a raster frame still resolves byte-exactly with none.
 
 ## Pixel-art rules
 

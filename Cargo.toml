@@ -42,7 +42,7 @@ noxel-debug = { path = "crates/noxel-debug", version = "0.1.0" }
 noxel-app = { path = "crates/noxel-app", version = "0.1.0" }
 
 # NOTE: Noxel intentionally has ZERO third-party dependencies.
-# See docs/adr/0002-zero-dependency-policy.md for the rationale and for the
+# See docs/adr/0002-no-dependencies.md for the rationale and for the
 # rules a future contributor must follow before adding one.
 
 # ---- Build profiles -------------------------------------------------------

@@ -118,9 +118,11 @@ Notes that save time:
   an order of magnitude off the real number, and it is a different number rather
   than a smaller one.
 
-`.github/workflows/` exists but is **empty** — there is no committed CI
-configuration yet, so these commands are the local contract rather than a
-description of a running pipeline.
+`.github/workflows/ci.yml` runs exactly these steps on push and on a pull
+request: format, build, clippy with `-D warnings`, test, doc, `noxel-gen verify`
+and a headless demo render. `scripts/check.sh` runs the same gate locally, with
+`--fast` to skip the release build and the demo. Chat about a command here and
+in the workflow, or the two will drift.
 
 ## Conventions from the testing strategy
 
@@ -214,7 +216,7 @@ Each of these has cost someone real time in this codebase.
 | **`AppConfig::mode` does not set the tone curve** | `App::resolve()` calls `self.config.render.resolve()`, and `AppConfig::with_mode` only writes `config.mode`. A ray-traced app with the default `render` settings resolves with `ToneMap::None` |
 | **Section budgets are opt-in** | `DebugSystem::record_section` only records when `DebugConfig::record_sections` is true, and `DebugConfig::disabled()` sets it false. Measurements that "disappeared" are usually this |
 | **Half the `FrameSample` fields are unfilled** | `release`, `visibility_ms`, `stream_ms`, `npc_ms` and `physics_ms` exist but nothing in the engine writes them; a game fills them through the budgets named `physics`, `visibility`, `stream` and `npc` |
-| **`town-demo`'s test target does not build** | the example binary compiles, but `cargo test -p town-demo` fails on `Handle::<Instance>::default()` in `examples/town-demo/src/actors.rs` (two call sites). `cargo check --workspace` is clean; `--all-targets` is not. See `examples/town-demo/README.md` |
+| **`--all-targets` is the only honest check** | `cargo check --workspace` compiles the libraries and skips every test and example target, so it will happily pass while `cargo test` fails to build. Use `cargo clippy --workspace --all-targets -- -D warnings`, which is what CI runs. |
 | **`tools/noxel-gen` writes byte-stable output** | JSON keeps the author's key order, atlas packing sorts by height then name, and PNG encoding is a fixed algorithm. A change that reorders keys or entries produces a huge diff for no reason |
 
 ## Definition of done
