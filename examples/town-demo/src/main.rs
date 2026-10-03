@@ -94,7 +94,7 @@ fn run(args: &Args) -> Result<(), String> {
     let dumping = args.dump.is_some() && (!args.window || args.dump_given);
     let dump_dir = dump_root(args);
     let assets = asset_root();
-    let mut app = build_app(args, &assets)?;
+    let mut app = setup(args, &assets)?;
 
     if args.world_info {
         print_world_info(&mut app, args);
@@ -102,23 +102,16 @@ fn run(args: &Args) -> Result<(), String> {
     }
 
     if args.window {
+        // Warm up *before* the window exists, so the first frame it presents is
+        // a village rather than fog. The window is still on screen almost
+        // immediately — this is about a fifth of a second.
+        warm_up(&mut app);
         return run_in_window(args, app);
     }
 
-    let terrain_plugin = TerrainPlugin::new();
-    let player_plugin = PlayerPlugin::new();
-    let crowd_plugin = CrowdPlugin::new(npc_config(args));
-
-    app.add_plugin(terrain_plugin);
-    app.add_plugin(player_plugin);
-    app.add_plugin(crowd_plugin);
-
     // Warm up: the first few frames load chunks and place the player. Reports
     // and dumps start after this so the first PNG is a settled frame.
-    let warmup = 12u64;
-    for _ in 0..warmup {
-        app.step(FIXED_DT);
-    }
+    warm_up(&mut app);
 
     if args.stats_only {
         let report = app.run_and_capture(1);
@@ -320,6 +313,38 @@ fn dump_root(args: &Args) -> std::path::PathBuf {
     let _ = std::fs::create_dir_all(&fallback);
     fallback
 }
+
+/// Builds the app and registers the demo's three plugins.
+///
+/// Every path goes through here — headless, `--window`, `--world-info` — and
+/// that is on purpose. The windowed path once returned before the plugins were
+/// added, so the window opened onto an empty scene and presented a uniformly
+/// grey rectangle: the renderer, the blit and the presenter were all fine, and
+/// there was simply nothing in the world. One place that wires the plugins is
+/// what keeps that from happening again, and
+/// `the_window_path_renders_a_scene_and_not_an_empty_world` is the test that
+/// catches it if it does.
+fn setup(args: &Args, assets: &std::path::Path) -> Result<App, String> {
+    let mut app = build_app(args, assets)?;
+    app.add_plugin(TerrainPlugin::new());
+    app.add_plugin(PlayerPlugin::new());
+    app.add_plugin(CrowdPlugin::new(npc_config(args)));
+    Ok(app)
+}
+
+/// Steps the world forward before the first frame is shown.
+///
+/// Streaming a chunk is not instant, and a window that opens onto fifteen frames
+/// of empty fog reads as broken. `--frames 0` skips it, which is what the tests
+/// use.
+fn warm_up(app: &mut App) {
+    for _ in 0..WARMUP_FRAMES {
+        app.step(FIXED_DT);
+    }
+}
+
+/// How many fixed steps to run before anything is shown or dumped.
+const WARMUP_FRAMES: u64 = 12;
 
 /// Opens a window and hands the app to it.
 ///
@@ -565,5 +590,89 @@ mod tests {
             "the crowd must stay inside the streaming radius, or agents walk into \
              chunks that are not loaded"
         );
+    }
+
+    use std::collections::BTreeSet;
+
+    fn args() -> Args {
+        Args {
+            quiet: true,
+            dump: None,
+            stats_only: false,
+            ..Args::default()
+        }
+    }
+
+    /// The bug this exists for: `--window` used to return before the plugins were
+    /// registered, so the window opened on an empty scene and presented a
+    /// uniformly grey rectangle. Every layer below was working; there was just
+    /// nothing in the world.
+    #[test]
+    fn the_window_path_renders_a_scene_and_not_an_empty_world() {
+        let args = args();
+        let mut app = setup(&args, &asset_root()).unwrap();
+        warm_up(&mut app);
+
+        let image = app.resolve();
+        let distinct: BTreeSet<(u8, u8, u8)> =
+            image.pixels.iter().map(|c| (c.r, c.g, c.b)).collect();
+        assert!(
+            distinct.len() > 20,
+            "a windowed run must have a world in it, not {} distinct colours",
+            distinct.len()
+        );
+    }
+
+    /// Proves the test above is actually testing something: an app with no
+    /// plugins really does render a flat frame.
+    #[test]
+    fn without_the_plugins_the_frame_is_flat() {
+        let args = args();
+        let mut app = build_app(&args, &asset_root()).unwrap();
+        warm_up(&mut app);
+
+        let image = app.resolve();
+        let distinct: BTreeSet<(u8, u8, u8)> =
+            image.pixels.iter().map(|c| (c.r, c.g, c.b)).collect();
+        assert!(
+            distinct.len() < 10,
+            "an empty world should be nearly flat, but had {} colours",
+            distinct.len()
+        );
+    }
+
+    #[test]
+    fn setup_registers_all_three_demo_plugins() {
+        let args = args();
+        let app = setup(&args, &asset_root()).unwrap();
+        let mut names = app.plugins.names();
+        names.sort_unstable();
+        assert_eq!(names, ["crowd", "player", "terrain"]);
+    }
+
+    #[test]
+    fn world_info_does_not_need_a_window() {
+        let args = Args {
+            world_info: true,
+            quiet: true,
+            dump: None,
+            ..Args::default()
+        };
+        let mut app = setup(&args, &asset_root()).unwrap();
+        warm_up(&mut app);
+        // Chunks are resident, so the report has something to print.
+        assert!(app.context.streamer.stats().loaded > 0);
+    }
+
+    #[test]
+    fn a_headless_run_still_renders_a_scene() {
+        // The headless path is the CI path; it must not regress while the window
+        // path is being fixed.
+        let args = args();
+        let mut app = setup(&args, &asset_root()).unwrap();
+        warm_up(&mut app);
+        let report = app.run_headless(5);
+        assert_eq!(report.frames, 5);
+        assert!(report.fragments > 0, "the renderer drew something");
     }
 }

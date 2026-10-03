@@ -238,7 +238,13 @@ impl<H: Host> Handler<H> {
             scale,
             self.config.background,
         );
-        let _ = buffer.present();
+        // A failed present is worth hearing about exactly once, and never worth
+        // taking the frame loop down for: the next frame will try again.
+        if let Err(error) = buffer.present() {
+            if self.frames < 2 {
+                eprintln!("noxel-window: could not present a frame: {error}");
+            }
+        }
 
         self.frames += 1;
         let suffix = self.host.title_suffix();
