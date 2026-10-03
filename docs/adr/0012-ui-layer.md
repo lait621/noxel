@@ -10,7 +10,8 @@ grounds that the original requirement was explicit: *no UI/UX is needed; the
 deliverable is documentation instead*. That reasoning was sound and is not being
 revisited. What has changed is the premise.
 
-The engine now has a game built on it (`games/noxel-valley`), and that game needs
+The engine now has a game built on it ([Noxel Valley](https://github.com/lait621/Noxel-valley)),
+and that game needs
 a clock, a hotbar, an inventory, a shop, a shipping bin, a morning report and a
 control reference. Every one of those is text, rectangles, hit testing and
 layout — the four things ADR 0009 explicitly declined to provide.

@@ -166,7 +166,6 @@ Two orderings are not arbitrary:
 | `noxel-app` | `App`, `Plugin`, the fixed-timestep frame loop | all of the above |
 | `tools/noxel-gen` | the asset generator | core, asset |
 | `examples/town-demo` | a complete village | everything |
-| `games/noxel-valley` | a playable farming game | everything |
 
 Dependencies point **one way only**. That is a rule, not a coincidence: it means
 any crate can be understood by reading it and the crates below it, and no crate

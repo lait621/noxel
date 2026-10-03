@@ -9,16 +9,17 @@ $ cargo test --workspace                # 1690 tests, a few seconds, no display 
 $ cargo run -p noxel-gen -- generate    # regenerate every asset in examples/town-demo/assets
 ```
 
-**There is a game.** `games/noxel-valley` is a playable top-down farming game
-built on the engine, and the reference project for its UI layer:
+**There is a game.** *Noxel Valley* is a playable top-down farming game built on
+this engine, and the reference project for its UI layer. It lives in its own
+repository, so this one stays an engine:
 
 ```text
-$ cargo run -p noxel-valley --features window -- --window   # play it
-$ open dist/Noxel\ Valley.app                              # or just double-click it
+$ git clone git@github.com:lait621/Noxel-valley.git
+$ cd Noxel-valley && cargo run --features window -- --window
 ```
 
-See [games/noxel-valley/README.md](games/noxel-valley/README.md) for what it does,
-how it is put together and what it is still bad at.
+It depends on this repository by revision, which is the useful direction: the
+engine can be read, changed and released without a game's assets in the tree.
 
 ---
 
@@ -172,12 +173,12 @@ design error, not a compile error you can work around.
 | `noxel-world` | deterministic terrain, biomes, road lattice, towns, chunk streaming, prefabs |
 | `noxel-npc` | crowd tiers, flow-field and A* pathfinding, steering, daily schedules |
 | `noxel-ui` | bitmap text with per-script fallback, clipped nine-slice drawing, integer layout, widgets |
+| `noxel-audio` | a synthesiser, a procedural composer, and a device stream behind an opt-in feature |
 | `noxel-debug` | rolling statistics, section budgets, overlays, headless frame dumping, image diff |
 | `noxel-app` | `App`, `AppContext`, `Plugin`, the fixed-timestep frame loop |
-| `tools/noxel-gen` | the asset generator: textures, atlases, tilesets, prefabs, the palette, and the farm art |
+| `tools/noxel-gen` | the asset generator: textures, atlases, tilesets, prefabs, the palette — and the library a game's own generator builds on |
 | `tools/fontgen` | the UI font bake: a hand-drawn Latin face plus the GB2312 common characters |
 | `examples/town-demo` | a ready-to-run village with a player, NPCs, physics and dumped frames |
-| `games/noxel-valley` | a playable farming game: farming, time, weather, trade, and a full game UI |
 
 ---
 
@@ -198,6 +199,7 @@ that shape everything else:
 | [0008](docs/adr/0008-deterministic-rendering.md) | Rendering is deterministic, which is what makes golden-image tests possible |
 | [0009](docs/adr/0009-no-ui.md) | No UI toolkit — superseded by 0012 |
 | [0012](docs/adr/0012-ui-layer.md) | A UI layer, as a crate, with a deliberately narrow boundary |
+| [0013](docs/adr/0013-audio.md) | Audio, and a second exception to the dependency rule |
 | [0010](docs/adr/0010-testing-strategy.md) | Every invariant has a test; a failing test means deciding whether the code or the test is wrong |
 
 ---
@@ -221,7 +223,7 @@ under `docs/zh-CN/` — start at [`docs/zh-CN/文档索引.md`](docs/zh-CN/文�
 | [`docs/08-performance.md`](docs/08-performance.md) | Where the time goes and how to measure it |
 | [`docs/api/`](docs/api) | Per-crate API reference |
 | [`docs/contributing-for-ai.md`](docs/contributing-for-ai.md) | How to work on this codebase, written for an AI agent |
-| [`games/noxel-valley/README.md`](games/noxel-valley/README.md) | The game: systems, layout, asset pipeline, known weak points |
+| [Noxel Valley](https://github.com/lait621/Noxel-valley) | The game built on this engine, in its own repository |
 
 Regenerate the API docs with `cargo doc --workspace --no-deps --open`.
 

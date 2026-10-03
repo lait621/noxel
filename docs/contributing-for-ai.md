@@ -29,7 +29,6 @@ it in this list and nothing below it, and there are no cycles.
 | 6 | `noxel-app` | all of the above |
 | — | `tools/noxel-gen` | core, asset |
 | — | `examples/town-demo` | all of the above |
-| — | `games/noxel-valley` | all of the above |
 
 ```text
 core ─┬─ ecs ─────────────────────────────┐

@@ -250,6 +250,14 @@ impl UiState {
         self.modal = modal;
     }
 
+    /// Lifts the modal flag, so the widgets drawn after this can be used.
+    ///
+    /// The other half of [`Ui::modal_scrim`]: the scrim blocks what comes
+    /// before it, and this unblocks what comes after.
+    pub fn unmodal(&mut self) {
+        self.modal = false;
+    }
+
     /// Whether a modal is owning the screen.
     #[must_use]
     pub fn is_modal(&self) -> bool {
@@ -404,8 +412,18 @@ impl Ui {
     ///
     /// The scrim is what makes a modal read as modal: without the darkening pass
     /// the world behind stays as bright as the dialog and the player keeps
-    /// looking at the farm instead of at the menu. It also marks the frame as
-    /// modal, so nothing underneath reacts to the pointer.
+    /// looking at the farm instead of at the menu.
+    ///
+    /// It also marks the frame modal, which is the part to be careful with:
+    /// [`UiState::interact`] refuses to hover *anything* while the modal flag is
+    /// set, so a screen that drew its scrim and then its own buttons would find
+    /// the buttons dead. The flag is for what is *underneath* — draw it first,
+    /// then call [`Ui::unmodal`] before drawing the dialog's own widgets.
+    pub fn unmodal(&mut self) {
+        self.state.unmodal();
+    }
+
+    /// Draws a scrim over the whole screen and returns the painter, for a modal.
     pub fn modal_scrim<'a>(
         &mut self,
         target: &'a mut noxel_render::framebuffer::Framebuffer,

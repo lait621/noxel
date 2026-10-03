@@ -17,88 +17,25 @@
 //! noxel-gen generate [--out DIR] [--seed N] [--force]
 //! noxel-gen verify   [--out DIR]
 //! noxel-gen preview  [--out DIR] [--scale N]
-//! noxel-gen farm     --out DIR [--scale N]
 //! noxel-gen list
 //! ```
+//!
+//! The generator is also a **library**. `draw`, `palette` and `error` are the
+//! primitives a game's own art generator builds on, so a game can ship its own
+//! sprites without forking this crate or copying those files and letting them
+//! drift. See `noxel-gen`'s library documentation.
 
 #![forbid(unsafe_code)]
 
-mod assets;
-mod buildings;
-mod characters;
-mod cli;
-mod draw;
-mod error;
-mod farm;
-mod farm_preview;
-mod palette;
-mod prefabs;
-mod preview;
-mod props;
-mod sprites;
-mod terrain;
-mod tilesets;
-mod world;
-
-#[cfg(test)]
-mod tests;
-
 use std::process::ExitCode;
-
-/// The default generation seed: `NOXEL` in ASCII.
-///
-/// It is small enough to survive the JSON round trip through an `f64` without
-/// losing precision, which matters because it is written into `world/demo.json`.
-pub const DEFAULT_SEED: u64 = 0x004E_4F58_454C;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
+    match noxel_gen::run(&args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("noxel-gen: error: {error}");
             ExitCode::FAILURE
         }
     }
-}
-
-/// Dispatches one command line.
-fn run(args: &[String]) -> error::Result<()> {
-    match cli::parse(args)? {
-        cli::Command::Generate { out, seed, force } => {
-            let summary = assets::generate(&out, seed, force)?;
-            println!("{}", summary.line(&out));
-        }
-        cli::Command::Verify { out } => {
-            // The seed lives in the world the assets describe, so `verify` can
-            // check a tree that was generated with `--seed N` without being
-            // told about it again.
-            let seed = assets::seed_from_disk(&out).unwrap_or(DEFAULT_SEED);
-            let summary = assets::verify(&out, seed)?;
-            println!(
-                "noxel-gen: verified {} files, {} bytes (seed {seed}) in {}",
-                summary.files,
-                summary.bytes,
-                out.display()
-            );
-        }
-        cli::Command::Preview { out, scale } => {
-            let (width, height) = preview::write(&out, scale)?;
-            println!(
-                "noxel-gen: preview {width}x{height} (scale {scale}) -> {}",
-                out.join("preview.png").display()
-            );
-        }
-        cli::Command::Farm { out, scale } => {
-            let summary = farm::write(&out, scale)?;
-            println!("{}", summary.line(&out));
-        }
-        cli::Command::List => {
-            print!("{}", assets::listing(DEFAULT_SEED)?);
-        }
-        cli::Command::Help => {
-            print!("{}", cli::USAGE);
-        }
-    }
-    Ok(())
 }

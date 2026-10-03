@@ -8,8 +8,7 @@
 //! noxel-gen generate [--out DIR] [--seed N] [--force]
 //! noxel-gen verify   [--out DIR]
 //! noxel-gen preview  [--out DIR] [--scale N]
-//! noxel-gen farm     --out DIR [--scale N]
-//! noxel-gen list
+//! //! noxel-gen list
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -24,8 +23,7 @@ USAGE:
     noxel-gen generate [--out DIR] [--seed N] [--force]
     noxel-gen verify   [--out DIR]
     noxel-gen preview  [--out DIR] [--scale N]
-    noxel-gen farm     --out DIR [--scale N]
-    noxel-gen list
+        noxel-gen list
 
 COMMANDS:
     generate    Write every asset, skipping files whose bytes are unchanged.
@@ -45,8 +43,7 @@ OPTIONS:
     --seed N    Generation seed (default 0x4E4F58454C). Only changes the
                 procedural detail scatter, never a file's identity.
     --force     generate: rewrite every file even when it is up to date.
-    --scale N   preview and farm: integer upscale of the contact sheet
-                (default 4 for preview, 3 for farm).
+    --scale N   preview: integer upscale of the contact sheet (default 4).
     -h, --help  Print this text.
 ";
 
@@ -72,13 +69,6 @@ pub enum Command {
         /// Asset root; the sheet is written next to the textures.
         out: PathBuf,
         /// Integer upscale factor.
-        scale: u32,
-    },
-    /// Write the farm atlas set into `<out>/farm`.
-    Farm {
-        /// Asset root; the farm set goes in a `farm` directory under it.
-        out: PathBuf,
-        /// Integer upscale of the contact sheet.
         scale: u32,
     },
     /// Print the manifest of everything the generator writes.
@@ -122,9 +112,9 @@ pub fn parse(args: &[String]) -> Result<Command> {
         }
     }
 
-    // `farm` is the one command that will not guess an asset root: its output
-    // is a new tree, and the default root is the demo's shipped assets.
-    let out_given = out.is_some();
+    // Every remaining command writes into the demo's asset tree unless it is
+    // told otherwise. Resolving it here rather than per-command keeps the
+    // "where does this go" question in one place.
     let out = match out {
         Some(path) => path,
         None => default_out_dir()?,
@@ -160,23 +150,6 @@ pub fn parse(args: &[String]) -> Result<Command> {
             Ok(Command::Preview {
                 out,
                 scale: scale.unwrap_or(DEFAULT_PREVIEW_SCALE),
-            })
-        }
-        "farm" => {
-            if !out_given {
-                return Err(Error::usage(format!(
-                    "`farm` needs an explicit `--out DIR`\n\n{USAGE}"
-                )));
-            }
-            if seed.is_some() {
-                return Err(Error::usage("`--seed` is only valid for `generate`"));
-            }
-            if force {
-                return Err(Error::usage("`--force` is only valid for `generate`"));
-            }
-            Ok(Command::Farm {
-                out,
-                scale: scale.unwrap_or(crate::farm::DEFAULT_PREVIEW_SCALE),
             })
         }
         "list" => {

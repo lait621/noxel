@@ -1,0 +1,21 @@
+[package]
+name = "noxel-audio"
+description = "Noxel's audio layer: a small synthesiser, a procedural composer, and a platform output behind an opt-in feature."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+# Off by default, like `noxel-window`: `cargo build` still downloads nothing and
+# the synthesiser and composer are testable with no device present. This is the
+# second of the two deliberate exceptions to docs/adr/0002-no-dependencies.md,
+# and docs/adr/0013-audio.md records why there is a second one.
+output = ["dep:cpal"]
+
+[dependencies]
+noxel-core.workspace = true
+cpal = { version = "0.18", optional = true, default-features = false }
