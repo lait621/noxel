@@ -95,6 +95,13 @@ pub struct WindowConfig {
     ///
     /// Used by the tests and by `--frames`, which need a headless-ish run.
     pub exit_after: Option<f32>,
+    /// Whether Escape closes the window.
+    ///
+    /// `true` by default, which is what a demo wants: one key to get out of a
+    /// viewer. A **game** should set it to `false` and give Escape to its own
+    /// menus, because a player expects Escape to back out of a screen and a key
+    /// that ends the session instead loses an afternoon to a mis-press.
+    pub quit_on_escape: bool,
 }
 
 impl Default for WindowConfig {
@@ -106,11 +113,19 @@ impl Default for WindowConfig {
             pixel_perfect: true,
             background: [8, 10, 16],
             exit_after: None,
+            quit_on_escape: true,
         }
     }
 }
 
 impl WindowConfig {
+    /// Leaves Escape to the game rather than closing the window with it.
+    #[must_use]
+    pub fn keep_escape(mut self) -> Self {
+        self.quit_on_escape = false;
+        self
+    }
+
     /// Sets the title.
     #[must_use]
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
@@ -662,6 +677,19 @@ mod tests {
         assert!(config.pixel_perfect);
         assert!(config.exit_after.is_none());
         assert!(!config.title.is_empty());
+    }
+
+    #[test]
+    fn escape_closes_the_window_unless_the_game_asks_for_the_key() {
+        // A demo wants one key to get out of a viewer. A game wants Escape to
+        // back out of a menu, and a host that closes on it takes the key before
+        // the game ever sees it — which is what made holding Escape quit the
+        // session in the middle of a farm.
+        assert!(
+            WindowConfig::default().quit_on_escape,
+            "the demo convention is the default"
+        );
+        assert!(!WindowConfig::default().keep_escape().quit_on_escape);
     }
 
     #[test]

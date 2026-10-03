@@ -126,9 +126,16 @@ impl<H: Host> ApplicationHandler for Handler<H> {
                             key::ALT => self.input.alt = event.state == ElementState::Pressed,
                             _ => {}
                         }
-                        // Escape quits, which is the one convention every player
-                        // expects and no game should have to implement.
-                        if mapped == key::ESCAPE && event.state == ElementState::Pressed {
+                        // Escape closes the window by default, which is the
+                        // right convention for a demo and the wrong one for a
+                        // game: a player expects Escape to back out of a menu,
+                        // and a key that ends the session instead is a key that
+                        // loses an afternoon to a mis-press. A game turns this
+                        // off and handles the key itself.
+                        if self.config.quit_on_escape
+                            && mapped == key::ESCAPE
+                            && event.state == ElementState::Pressed
+                        {
                             self.host.shutdown();
                             event_loop.exit();
                         }
