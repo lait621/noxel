@@ -129,6 +129,13 @@ impl Default for Material {
 }
 
 impl Material {
+    /// Attaches a texture.
+    #[must_use]
+    pub fn with_texture(mut self, texture: TextureHandle) -> Self {
+        self.texture = Some(texture);
+        self
+    }
+
     /// A flat unlit colour. The single most common material in a pixel game.
     #[must_use]
     pub fn unlit(name: impl Into<String>, color: Color) -> Self {

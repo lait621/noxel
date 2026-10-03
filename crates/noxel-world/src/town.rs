@@ -13,26 +13,28 @@
 //!
 //! ```
 //! use noxel_core::math::ChunkPos;
-//! use noxel_world::gen::WorldConfig;
+//! use noxel_world::WorldConfig;
 //! use noxel_world::town::TownPlan;
 //!
 //! let config = WorldConfig::new(4);
 //! let plan = TownPlan::generate(&config, ChunkPos::new(0, 0), &[], |_, _| 0.0);
 //! assert_eq!(plan.center_chunk, ChunkPos::new(0, 0));
 //! assert!(!plan.name.is_empty());
-//! assert_eq!(plan.building_plots.len() >= plan.buildings().len(), true);
+//!
+//! // An empty prefab library still yields a town: the fallback house fills in.
+//! let buildings = plan.instantiate(&config, &[], |_, _| 0.0);
+//! assert!(!buildings.is_empty());
 //! ```
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use noxel_asset::format::{Prefab, PrefabVoxel};
-use noxel_core::math::{Aabb, ChunkPos, Rect, Vec2, Vec3, TAU};
+use noxel_core::math::{Aabb, ChunkPos, Rect, Vec2, Vec3};
 use noxel_core::rng::{RngStream, hash_combine, hash_str};
 
-use crate::gen::WorldConfig;
+use crate::r#gen::WorldConfig;
 use crate::road::{RoadSegment, macro_line_x, macro_line_z, nearest_line_index};
-use crate::town::Facing::{East, North, South, West};
 
 /// Which way a building's front faces, in world axes.
 ///
@@ -109,11 +111,15 @@ impl Facing {
             return Self::North;
         }
         if v.x.abs() > v.z.abs() {
-            if v.x > 0.0 { East } else { West }
+            if v.x > 0.0 {
+                Facing::East
+            } else {
+                Facing::West
+            }
         } else if v.z > 0.0 {
-            South
+            Facing::South
         } else {
-            North
+            Facing::North
         }
     }
 
@@ -192,7 +198,7 @@ impl TownStyle {
     #[must_use]
     pub fn plot_gap_tiles(self) -> f32 {
         // Dense towns almost touch; hamlets leave two tiles of garden.
-        crate::gen::lerp_f32(2.0, 0.4, self.building_density())
+        crate::r#gen::lerp_f32(2.0, 0.4, self.building_density())
     }
 }
 
@@ -350,16 +356,6 @@ impl TownPlan {
         self.radius_chunks.max(0) as f32 * config.chunk_world_size()
     }
 
-    /// Every building this plan would place, in plot order.
-    ///
-    /// Recomputed from the plots, so it is cheap to call and needs no extra
-    /// storage on the plan. The instancing itself lives in
-    /// [`TownPlan::instantiate`]; this is the "how many, and where" view.
-    #[must_use]
-    pub fn buildings(&self) -> Vec<BuildingInstance> {
-        Vec::new()
-    }
-
     /// True when a world position lies inside the built-up disc.
     #[must_use]
     pub fn contains_world(&self, config: &WorldConfig, p: Vec3) -> bool {
@@ -420,26 +416,28 @@ impl TownPlan {
         F: Fn(f32, f32) -> f32,
     {
         let cs = config.chunk_world_size();
-        let ts = sanitize_tile_size(config.tile_size);
         let radius_chunks = config.town_radius_chunks.max(1);
         let radius = radius_chunks as f32 * cs;
         let centre = center_chunk.to_world_center(cs, 0.0);
         let centre = Vec3::new(centre.x, ground(centre.x, centre.z), centre.z);
 
-        let mut rng = RngStream::for_chunk(
-            config.seed,
-            "town/layout",
-            center_chunk.x,
-            center_chunk.y,
-        )
-        .rng();
-        let style = pick_style(&mut rng);
+        let style = town_style_at(config, center_chunk);
         let name = town_name(config, center_chunk);
+        // Lift the analytic grid onto the ground the terrain actually has.
+        let streets: Vec<RoadSegment> = town_streets(config, center_chunk)
+            .into_iter()
+            .map(|street| {
+                RoadSegment::new(
+                    Vec3::new(street.from.x, centre.y, street.from.z),
+                    Vec3::new(street.to.x, centre.y, street.to.z),
+                    street.width,
+                    street.is_main,
+                )
+            })
+            .collect();
 
-        let main_width = config.road_width_tiles.max(1) as f32 * ts * 1.5;
-        let side_width = config.road_width_tiles.max(1) as f32 * ts;
-        let streets = layout_streets(config, centre, radius, main_width, side_width, style);
-
+        let mut rng =
+            RngStream::for_chunk(config.seed, "town/plots", center_chunk.x, center_chunk.y).rng();
         let plots = layout_plots(config, centre, radius, style, prefabs, &streets, &mut rng);
 
         Self {
@@ -458,6 +456,9 @@ impl TownPlan {
     /// Every plot the generator claimed (`taken`) becomes a real building: a
     /// prefab when one fits, and the procedural fallback otherwise. Reserved
     /// plots stay empty.
+    ///
+    /// The building is inset half a tile into its plot, so the one-tile margin
+    /// the layout reserved stays a visible gap between neighbours.
     #[must_use]
     pub fn instantiate<F>(
         &self,
@@ -477,42 +478,48 @@ impl TownPlan {
         )
         .rng();
         let mut out = Vec::new();
-        for (index, plot) in self.building_plots.iter().enumerate() {
+        for plot in &self.building_plots {
             if !plot.taken {
                 continue;
             }
-            let rot = rotated_footprint(
-                (
-                    (plot.size_tiles.0.saturating_sub(1)).max(1),
-                    (plot.size_tiles.1.saturating_sub(1)).max(1),
-                ),
-                plot.facing,
+            let origin = Vec3::new(
+                plot.position.x + ts * 0.5,
+                plot_ground(&plot, ts, &ground),
+                plot.position.z + ts * 0.5,
             );
-            let fitted = fitting_prefab(prefabs, plot.facing, plot.size_tiles);
-            let base_y = ground(
-                plot.position.x + plot.size_tiles.0 as f32 * ts * 0.5,
-                plot.position.z + plot.size_tiles.1 as f32 * ts * 0.5,
-            );
-            let origin = Vec3::new(plot.position.x, base_y, plot.position.z);
-            match fitted {
-                Some(prefab) => {
-                    let mut building = instance_prefab(prefab, origin, plot.facing, ts);
-                    if building.size_tiles != rot {
-                        building.size_tiles = rot;
-                    }
-                    out.push(building);
-                }
-                None => out.push(procedural_building(
-                    &mut rng,
-                    index,
-                    plot,
-                    origin,
-                    ts,
-                )),
+            match fitting_prefab(prefabs, plot.facing, plot.size_tiles) {
+                Some(prefab) => out.push(instance_prefab(prefab, origin, plot.facing, ts)),
+                None => out.push(procedural_building(&mut rng, plot, origin, ts)),
             }
         }
         out
     }
+}
+
+/// The ground height a building should stand on: the highest sample over the
+/// plot, so a building on a slope is never buried in the terrain.
+#[must_use]
+fn plot_ground<F>(plot: &BuildingPlot, ts: f32, ground: &F) -> f32
+where
+    F: Fn(f32, f32) -> f32,
+{
+    let w = plot.size_tiles.0 as f32 * ts;
+    let d = plot.size_tiles.1 as f32 * ts;
+    let corners = [
+        (plot.position.x, plot.position.z),
+        (plot.position.x + w, plot.position.z),
+        (plot.position.x, plot.position.z + d),
+        (plot.position.x + w, plot.position.z + d),
+        (plot.position.x + w * 0.5, plot.position.z + d * 0.5),
+    ];
+    let mut best = f32::NEG_INFINITY;
+    for (x, z) in corners {
+        let h = ground(x, z);
+        if h.is_finite() && h > best {
+            best = h;
+        }
+    }
+    if best.is_finite() { best } else { 0.0 }
 }
 
 /// The prefab footprint `(x, z)` in tiles once rotated onto `facing`.
@@ -524,6 +531,65 @@ pub fn rotated_footprint(footprint: (u32, u32), facing: Facing) -> (u32, u32) {
         Facing::North | Facing::South => footprint,
         Facing::East | Facing::West => (footprint.1, footprint.0),
     }
+}
+
+/// The town-lattice cell whose centre is nearest to a world XZ position.
+///
+/// This is a pure function of the position and the configuration — no plan, no
+/// prefabs — which is what lets the height field flatten a town disc, and the
+/// tile pass stamp its streets, without building anything.
+#[must_use]
+pub fn nearest_town_cell(config: &WorldConfig, x: f32, z: f32) -> ChunkPos {
+    let spacing = config.town_spacing().max(1);
+    let step = spacing as f32 * config.chunk_world_size();
+    let i = if x.is_finite() {
+        (x / step).round().clamp(-4_000_000.0, 4_000_000.0) as i32
+    } else {
+        0
+    };
+    let j = if z.is_finite() {
+        (z / step).round().clamp(-4_000_000.0, 4_000_000.0) as i32
+    } else {
+        0
+    };
+    ChunkPos::new(i * spacing, j * spacing)
+}
+
+/// The world-space centre of a town's lattice cell, on the ground plane.
+///
+/// The `y` component is `0`; callers fill it from the height field.
+#[must_use]
+pub fn town_centre(config: &WorldConfig, cell: ChunkPos) -> Vec3 {
+    cell.to_world_center(config.chunk_world_size(), 0.0)
+}
+
+/// The style of the town at a lattice cell.
+///
+/// Deterministic and cheap: one draw from the cell's own stream.
+#[must_use]
+pub fn town_style_at(config: &WorldConfig, cell: ChunkPos) -> TownStyle {
+    let mut rng = RngStream::for_chunk(config.seed, "town/layout", cell.x, cell.y).rng();
+    pick_style(&mut rng)
+}
+
+/// The street grid of the town at a lattice cell, with `y == 0`.
+///
+/// The grid is analytic: it depends only on the seed, the cell and the
+/// configuration, so the terrain carve, the tile pass and the town plan all see
+/// exactly the same streets.
+#[must_use]
+pub fn town_streets(config: &WorldConfig, cell: ChunkPos) -> Vec<RoadSegment> {
+    let ts = sanitize_tile_size(config.tile_size);
+    let radius = config.town_radius_chunks.max(1) as f32 * config.chunk_world_size();
+    let style = town_style_at(config, cell);
+    layout_streets(
+        config,
+        town_centre(config, cell),
+        radius,
+        config.road_width_tiles.max(1) as f32 * ts * 1.5,
+        config.road_width_tiles.max(1) as f32 * ts,
+        style,
+    )
 }
 
 /// A prefab that fits a plot of `plot_size` tiles with the given facing.
@@ -587,7 +653,7 @@ fn instance_prefab(prefab: &Prefab, origin: Vec3, facing: Facing, ts: f32) -> Bu
         origin.z + rot.1 as f32 * ts * 0.5,
     );
     let occluders = if prefab.occluders.is_empty() {
-        merge_voxel_runs(&prefab.voxels, prefab.size)
+        merge_voxel_runs(&prefab.voxels)
             .into_iter()
             .filter_map(|b| voxel_box_to_world(b, origin, centre, yaw, ts))
             .collect()
@@ -616,7 +682,6 @@ fn instance_prefab(prefab: &Prefab, origin: Vec3, facing: Facing, ts: f32) -> Bu
 #[must_use]
 fn procedural_building(
     rng: &mut noxel_core::rng::Pcg32,
-    index: usize,
     plot: &BuildingPlot,
     origin: Vec3,
     ts: f32,
@@ -657,7 +722,6 @@ fn procedural_building(
         origin.y + wall_height,
         roof_height,
     );
-    let _ = index;
     BuildingInstance {
         prefab: PROCEDURAL_PREFAB.to_string(),
         origin,
@@ -677,13 +741,7 @@ pub const PROCEDURAL_PREFAB: &str = "procedural_house";
 /// The rotation is about the footprint centre, and every facing is a multiple of
 /// 90°, so the result is exact rather than a conservative fit.
 #[must_use]
-fn voxel_box_to_world(
-    b: [u8; 6],
-    origin: Vec3,
-    centre: Vec2,
-    yaw: f32,
-    ts: f32,
-) -> Option<Aabb> {
+fn voxel_box_to_world(b: [u8; 6], origin: Vec3, centre: Vec2, yaw: f32, ts: f32) -> Option<Aabb> {
     let x0 = origin.x + b[0] as f32 * ts;
     let x1 = origin.x + (b[3] as f32 + 1.0) * ts;
     let z0 = origin.z + b[2] as f32 * ts;
@@ -704,7 +762,14 @@ fn voxel_box_to_world(
     if !(max_x > min_x && max_z > min_z) || !min_x.is_finite() {
         return None;
     }
-    Some(Aabb::from_footprint(min_x, min_z, max_x, max_z, y0, y1 - y0))
+    Some(Aabb::from_footprint(
+        min_x,
+        min_z,
+        max_x,
+        max_z,
+        y0,
+        y1 - y0,
+    ))
 }
 
 /// Rotates an XZ point about `centre` by `yaw`.
@@ -737,7 +802,7 @@ fn normalise_voxel_box(b: [u8; 6]) -> [u8; 6] {
 /// along `+X` and then `+Z` while the neighbours agree. A solid house becomes
 /// one box; an L-shaped one becomes two or three.
 #[must_use]
-pub fn merge_voxel_runs(voxels: &[PrefabVoxel], size: [u8; 3]) -> Vec<[u8; 6]> {
+pub fn merge_voxel_runs(voxels: &[PrefabVoxel]) -> Vec<[u8; 6]> {
     if voxels.is_empty() {
         return Vec::new();
     }
@@ -748,25 +813,27 @@ pub fn merge_voxel_runs(voxels: &[PrefabVoxel], size: [u8; 3]) -> Vec<[u8; 6]> {
     // Per-column vertical runs.
     let mut runs: Vec<[u8; 6]> = Vec::new();
     let mut columns: Vec<(u8, u8)> = Vec::new();
-    for &(x, y, z) in &occupied {
-        let _ = y;
+    for &(x, _, z) in &occupied {
         columns.push((x, z));
     }
     columns.sort_unstable();
     columns.dedup();
+    let max_y: u16 = occupied
+        .iter()
+        .map(|&(_, y, _)| y as u16)
+        .max()
+        .unwrap_or(0)
+        + 1;
     for (x, z) in columns {
-        let mut y = 0u16;
-        let max_y = size[1] as u16 + 1;
-        while y <= max_y {
-            if occupied.contains(&(x, y as u8, z)) {
+        let mut y: u16 = 0;
+        while y < max_y {
+            if y <= 255 && occupied.contains(&(x, y as u8, z)) {
                 let start = y;
-                while y <= max_y && occupied.contains(&(x, y as u8, z)) {
+                while y < max_y && y <= 255 && occupied.contains(&(x, y as u8, z)) {
                     y += 1;
                 }
-                if start < 256 {
-                    let end = (y - 1).min(255) as u8;
-                    runs.push([x, start as u8, z, x, end, z]);
-                }
+                let end = (y.saturating_sub(1)).min(255) as u8;
+                runs.push([x, start as u8, z, x, end, z]);
             } else {
                 y += 1;
             }
@@ -782,9 +849,9 @@ pub fn merge_voxel_runs(voxels: &[PrefabVoxel], size: [u8; 3]) -> Vec<[u8; 6]> {
         }
         let base = runs[i];
         used[i] = true;
-        let mut x0 = base[0];
+        let x0 = base[0];
         let mut x1 = base[3];
-        let mut z0 = base[2];
+        let z0 = base[2];
         let mut z1 = base[5];
         // Grow along +X.
         loop {
@@ -826,9 +893,9 @@ pub fn merge_voxel_runs(voxels: &[PrefabVoxel], size: [u8; 3]) -> Vec<[u8; 6]> {
 /// Finds an unused run with exactly the given span.
 #[must_use]
 fn find_run(runs: &[[u8; 6]], used: &[bool], want: [u8; 6]) -> Option<usize> {
-    runs.iter()
-        .enumerate()
-        .position(|(i, b)| !used[i] && b[1] == want[1] && b[4] == want[4] && b[0] == want[0] && b[2] == want[2])
+    runs.iter().enumerate().position(|(i, b)| {
+        !used[i] && b[1] == want[1] && b[4] == want[4] && b[0] == want[0] && b[2] == want[2]
+    })
 }
 
 /// Clips a box to a region in XZ, keeping the full Y extent.
@@ -886,7 +953,8 @@ pub fn town_name(config: &WorldConfig, center_chunk: ChunkPos) -> String {
     const QUALIFIER: [&str; 8] = [
         "Little", "Great", "Upper", "Lower", "Old", "New", "East", "West",
     ];
-    let mut rng = RngStream::for_chunk(config.seed, "town/name", center_chunk.x, center_chunk.y).rng();
+    let mut rng =
+        RngStream::for_chunk(config.seed, "town/name", center_chunk.x, center_chunk.y).rng();
     let first = FIRST[rng.range_usize(0, FIRST.len())];
     let second = SECOND[rng.range_usize(0, SECOND.len())];
     // One name in six gets a qualifier, which makes the map read less uniformly.
@@ -989,27 +1057,19 @@ fn layout_plots(
     rng: &mut noxel_core::rng::Pcg32,
 ) -> Vec<BuildingPlot> {
     let ts = sanitize_tile_size(config.tile_size);
-    let cs = config.chunk_world_size();
     let built = ((config.buildings_per_town as f32) * style.building_scale()).round() as u32;
-    let built = if config.buildings_per_town == 0 {
-        0
+    let (built, slots) = if config.buildings_per_town == 0 {
+        // No buildings were asked for, but the layout still exists: every plot
+        // is reserved (`taken == false`) for the game to build on.
+        (0, 8)
     } else {
-        built.max(1)
+        let built = built.max(1);
+        // Over-provision by a quarter so a game has free plots to hand out.
+        (built, built + (built / 4).max(1))
     };
-    // Over-provision by a quarter so a game has free plots to hand out.
-    let slots = built + (built / 4).max(1);
-    let plaza_radius = cs * 0.8;
+    let plaza_reach = plaza_radius(config);
+    let plaza_centre = Vec2::new(centre.x, centre.z);
     let gap = style.plot_gap_tiles().max(0.0) * ts;
-    let plaza = Rect::new(
-        Vec2::new(
-            centre.x - plaza_radius,
-            centre.z - plaza_radius,
-        ),
-        Vec2::new(
-            centre.x + plaza_radius,
-            centre.z + plaza_radius,
-        ),
-    );
 
     let mut plots: Vec<BuildingPlot> = Vec::new();
     let mut rects: Vec<Rect> = Vec::new();
@@ -1020,7 +1080,6 @@ fn layout_plots(
             break;
         }
         let from = street.from;
-        let to = street.to;
         let length = street.length();
         let dir = street.direction();
         let normal = Vec3::new(-dir.z, 0.0, dir.x);
@@ -1037,17 +1096,15 @@ fn layout_plots(
                 let (w, d) = if rw == 0 {
                     // Nothing in the library fits: reserve a procedural plot in
                     // the range the fallback house can fill.
-                    let w = rng.range_i32(4, 7) as u32;
-                    let d = rng.range_i32(4, 6) as u32;
+                    let a = rng.range_i32(4, 7) as u32;
+                    let b = rng.range_i32(4, 6) as u32;
                     match facing {
-                        Facing::North | Facing::South => (w, d),
-                        Facing::East | Facing::West => (d, w),
+                        Facing::North | Facing::South => (a, b),
+                        Facing::East | Facing::West => (b, a),
                     }
                 } else {
-                    match facing {
-                        Facing::North | Facing::South => (rw + 1, rd + 1),
-                        Facing::East | Facing::West => (rw + 1, rd + 1),
-                    }
+                    // One tile of margin over the rotated footprint.
+                    (rw + 1, rd + 1)
                 };
                 let plot_w = w as f32 * ts;
                 let plot_d = d as f32 * ts;
@@ -1062,19 +1119,15 @@ fn layout_plots(
                 } else {
                     plot_w
                 };
-                let centre_point = Vec3::new(point.x, centre.y, point.z) + normal * side * (half + across * 0.5 + gap * 0.5);
+                let centre_point = Vec3::new(point.x, centre.y, point.z)
+                    + normal * side * (half + across * 0.5 + gap * 0.5);
                 let rect = Rect::new(
-                    Vec2::new(
-                        centre_point.x - plot_w * 0.5,
-                        centre_point.z - plot_d * 0.5,
-                    ),
-                    Vec2::new(
-                        centre_point.x + plot_w * 0.5,
-                        centre_point.z + plot_d * 0.5,
-                    ),
+                    Vec2::new(centre_point.x - plot_w * 0.5, centre_point.z - plot_d * 0.5),
+                    Vec2::new(centre_point.x + plot_w * 0.5, centre_point.z + plot_d * 0.5),
                 );
+                let half_diagonal = Vec2::new(plot_w * 0.5, plot_d * 0.5).length();
                 let ok = within_radius(rect, centre, radius)
-                    && !rect.intersects(&plaza)
+                    && !in_plaza(plaza_centre, rect.center(), half_diagonal, plaza_reach)
                     && !streets
                         .iter()
                         .any(|s| s.aabb(0.0).intersects(&rect_aabb(rect)))
@@ -1088,7 +1141,7 @@ fn layout_plots(
                     }
                     plots.push(BuildingPlot {
                         position: Vec3::new(rect.min.x, centre.y, rect.min.y),
-                        size_tiles: (d.max(1), d.max(1)).max((w.max(1), d.max(1))).into(),
+                        size_tiles: (w.max(1), d.max(1)),
                         facing,
                         taken,
                     });
@@ -1132,6 +1185,23 @@ fn choose_footprint(
     None
 }
 
+/// The radius of a town's plaza, in metres.
+///
+/// Roughly a third of a chunk: big enough to read as a town square, small enough
+/// that the chunk at the town's centre still has street frontage to build on.
+#[must_use]
+pub fn plaza_radius(config: &WorldConfig) -> f32 {
+    config.chunk_world_size() * 0.35
+}
+
+/// True when a footprint of `half_diagonal` metres around `p` would overlap the
+/// plaza.
+#[must_use]
+pub fn in_plaza(plaza_centre: Vec2, p: Vec2, half_diagonal: f32, radius: f32) -> bool {
+    let d = Vec2::new(p.x - plaza_centre.x, p.y - plaza_centre.y).length();
+    d < radius + half_diagonal.max(0.0)
+}
+
 /// True when the whole rectangle is inside the town disc.
 #[must_use]
 fn within_radius(rect: Rect, centre: Vec3, radius: f32) -> bool {
@@ -1145,12 +1215,7 @@ fn within_radius(rect: Rect, centre: Vec3, radius: f32) -> bool {
 #[must_use]
 fn rect_aabb(rect: Rect) -> Aabb {
     Aabb::from_footprint(
-        rect.min.x,
-        rect.min.y,
-        rect.max.x,
-        rect.max.y,
-        -1000.0,
-        2000.0,
+        rect.min.x, rect.min.y, rect.max.x, rect.max.y, -1000.0, 2000.0,
     )
 }
 
@@ -1163,10 +1228,6 @@ fn sanitize_tile_size(tile_size: f32) -> f32 {
         1.0
     }
 }
-
-/// The angle used by the town debug overlay: a full turn, re-exported so callers
-/// do not need `noxel_core` for the common case.
-pub const FULL_TURN: f32 = TAU;
 
 #[cfg(test)]
 mod tests {
@@ -1200,10 +1261,16 @@ mod tests {
     fn facing_yaws_are_cardinal() {
         for facing in Facing::ALL {
             let v = facing.vector();
-            assert_eq!(Vec3::from_yaw(facing.yaw()), v, "{facing:?}");
+            assert!(
+                Vec3::from_yaw(facing.yaw()).approx_eq(v, 1e-5),
+                "{facing:?}: {:?} vs {v:?}",
+                Vec3::from_yaw(facing.yaw())
+            );
             assert_eq!(Facing::from_yaw(facing.yaw()), facing);
             assert_eq!(Facing::from_vector(v), facing);
-            assert!((facing.yaw().abs() - 0.0).abs() < 1e-6 || facing.yaw().abs() > 0.5);
+            // Every cardinal yaw is a whole number of quarter turns.
+            let quarters = facing.yaw() / core::f32::consts::FRAC_PI_2;
+            assert!((quarters - quarters.round()).abs() < 1e-6, "{facing:?}");
         }
     }
 
@@ -1313,16 +1380,8 @@ mod tests {
             let plan = TownPlan::generate(&c, ChunkPos::new(i * 10, 0), &[], |_, _| 0.0);
             let radius = plan.radius_world(&c);
             assert_eq!(plan.radius_chunks, c.town_radius_chunks);
-            let plaza = Rect::new(
-                Vec2::new(
-                    plan.plaza_center.x - c.chunk_world_size() * 0.8,
-                    plan.plaza_center.z - c.chunk_world_size() * 0.8,
-                ),
-                Vec2::new(
-                    plan.plaza_center.x + c.chunk_world_size() * 0.8,
-                    plan.plaza_center.z + c.chunk_world_size() * 0.8,
-                ),
-            );
+            let plaza_centre = Vec2::new(plan.plaza_center.x, plan.plaza_center.z);
+            let reach = plaza_radius(&c);
             for plot in &plan.building_plots {
                 let centre = plot.center(c.tile_size);
                 let d = Vec2::new(
@@ -1331,7 +1390,12 @@ mod tests {
                 )
                 .length();
                 assert!(d <= radius, "plot at {d} m, radius {radius} m");
-                assert!(!plot.rect(c.tile_size).intersects(&plaza), "plot in plaza");
+                let rect = plot.rect(c.tile_size);
+                let half_diagonal = Vec2::new(rect.width() * 0.5, rect.height() * 0.5).length();
+                assert!(
+                    !in_plaza(plaza_centre, rect.center(), half_diagonal, reach),
+                    "plot in plaza: {plot:?}"
+                );
             }
         }
     }
@@ -1367,7 +1431,9 @@ mod tests {
         for plot in &plan.building_plots {
             for street in &plan.streets {
                 assert!(
-                    !street.aabb(0.0).intersects(&rect_aabb(plot.rect(c.tile_size))),
+                    !street
+                        .aabb(0.0)
+                        .intersects(&rect_aabb(plot.rect(c.tile_size))),
                     "plot {} overlaps {}",
                     plan.building_plots.len(),
                     plan.streets.len()
@@ -1387,7 +1453,8 @@ mod tests {
                 building.bounds.center().x,
                 building.origin.y,
                 building.bounds.center().z,
-            ) + building.facing.vector() * (building.size_tiles.0 as f32 * c.tile_size * 0.5);
+            ) + building.facing.vector()
+                * (building.size_tiles.0 as f32 * c.tile_size * 0.5);
             let d = plan.distance_to_street(front);
             assert!(
                 d < c.chunk_world_size() * 0.5,
@@ -1416,9 +1483,11 @@ mod tests {
     #[test]
     fn merging_a_solid_box_yields_one_box() {
         let voxels: Vec<PrefabVoxel> = (0..4)
-            .flat_map(|x| (0..3).flat_map(move |y| (0..4).map(move |z| PrefabVoxel { x, y, z, tile: 1 })))
+            .flat_map(|x| {
+                (0..3).flat_map(move |y| (0..4).map(move |z| PrefabVoxel { x, y, z, tile: 1 }))
+            })
             .collect();
-        let boxes = merge_voxel_runs(&voxels, [4, 3, 4]);
+        let boxes = merge_voxel_runs(&voxels);
         assert_eq!(boxes.len(), 1, "{boxes:?}");
         assert_eq!(boxes[0], [0, 0, 0, 3, 2, 3]);
         assert!(boxes.len() < voxels.len());
@@ -1434,14 +1503,14 @@ mod tests {
                 }
             }
         }
-        let boxes = merge_voxel_runs(&voxels, [6, 3, 4]);
+        let boxes = merge_voxel_runs(&voxels);
         assert_eq!(boxes.len(), 2, "{boxes:?}");
         assert!(boxes.len() < voxels.len());
     }
 
     #[test]
     fn merging_empty_voxels_is_empty() {
-        assert!(merge_voxel_runs(&[], [4, 4, 4]).is_empty());
+        assert!(merge_voxel_runs(&[]).is_empty());
     }
 
     #[test]
@@ -1458,11 +1527,16 @@ mod tests {
     }
 
     #[test]
-    fn zero_buildings_per_town_gives_an_empty_but_valid_plan() {
+    fn zero_buildings_per_town_gives_a_reserved_layout() {
         let mut c = config();
         c.buildings_per_town = 0;
         let plan = TownPlan::generate(&c, ChunkPos::new(0, 0), &[], |_, _| 0.0);
-        assert!(plan.building_plots.is_empty());
+        assert!(!plan.building_plots.is_empty(), "the layout still exists");
+        assert!(
+            plan.building_plots.iter().all(|plot| !plot.taken),
+            "nothing may be built when the config asks for no buildings"
+        );
+        assert_eq!(plan.free_plots().count(), plan.building_plots.len());
         assert!(plan.instantiate(&c, &[], |_, _| 0.0).is_empty());
         assert!(!plan.streets.is_empty(), "streets still exist");
     }
@@ -1518,7 +1592,13 @@ mod tests {
             assert_ne!(b.id(), 0);
             let region = b.bounds.expanded(100.0);
             assert!(!b.colliders_in(&region).is_empty());
-            assert!(b.colliders_in(&Aabb::new(Vec3::new(1e6, 1e6, 1e6), Vec3::new(1e6 + 1.0, 1e6 + 1.0, 1e6 + 1.0))).is_empty());
+            assert!(
+                b.colliders_in(&Aabb::new(
+                    Vec3::new(1e6, 1e6, 1e6),
+                    Vec3::new(1e6 + 1.0, 1e6 + 1.0, 1e6 + 1.0)
+                ))
+                .is_empty()
+            );
         }
     }
 }

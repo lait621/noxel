@@ -11,3 +11,4 @@ authors.workspace = true
 [dependencies]
 noxel-core.workspace = true
 noxel-render.workspace = true
+noxel-asset.workspace = true

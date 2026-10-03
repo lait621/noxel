@@ -7,8 +7,7 @@
 //! array index.
 //!
 //! ```
-//! use noxel_world::chunk::Chunk;
-//! use noxel_core::math::{Aabb, ChunkPos, Vec3};
+//! use noxel_world::chunk::{Chunk, ChunkPos};
 //!
 //! let chunk = Chunk::empty(ChunkPos::new(0, 0), 32, 1.0, noxel_world::BiomeId::PLAINS);
 //! assert_eq!(chunk.tiles(), 32);
@@ -18,12 +17,12 @@
 //! ```
 
 use noxel_asset::format::{TileDef, TileSet};
-use noxel_core::math::{Aabb, ChunkPos, Vec3};
+use noxel_core::math::{Aabb, Vec3};
 
 use crate::biome::BiomeId;
-use crate::town::BuildingInstance;
+use crate::town::BuildingInstance as TownBuilding;
 
-pub use noxel_core::math::ChunkPos as WorldChunkPos;
+pub use noxel_core::math::ChunkPos;
 
 /// World-space size of one tile, used when a chunk has to answer a geometric
 /// query without access to the generator that produced it.
@@ -52,7 +51,7 @@ pub struct Chunk {
     /// Decorative props placed from the prefab library.
     pub props: Vec<PropInstance>,
     /// Buildings that intersect this chunk.
-    pub buildings: Vec<BuildingInstance>,
+    pub buildings: Vec<TownBuilding>,
     /// Road centre lines that intersect this chunk, in world space.
     pub roads: Vec<crate::road::RoadSegment>,
     /// True when this chunk contains any part of a town.
@@ -153,7 +152,7 @@ impl Chunk {
 
     /// The tile definition behind `(x, y)`, if the tile set has it.
     #[must_use]
-    pub fn tile_def(&self, x: u32, y: u32, set: &TileSet) -> Option<&TileDef> {
+    pub fn tile_def<'a>(&self, x: u32, y: u32, set: &'a TileSet) -> Option<&'a TileDef> {
         self.index(x, y)?;
         set.tile(self.tile(x, y))
     }
@@ -210,7 +209,10 @@ impl Chunk {
             y_min = y_min.min(bounds.min.y);
             y_max = y_max.max(bounds.max.y);
         }
-        Aabb::new(Vec3::new(x0, y_min, z0), Vec3::new(x0 + size, y_max, z0 + size))
+        Aabb::new(
+            Vec3::new(x0, y_min, z0),
+            Vec3::new(x0 + size, y_max, z0 + size),
+        )
     }
 
     /// World position of the centre of tile `(x, y)`.
@@ -260,14 +262,17 @@ impl Chunk {
     /// the camera occlusion system ray-tests these every frame, so the merging
     /// is what keeps it affordable.
     pub fn occluder_boxes(&self) -> impl Iterator<Item = (Aabb, u64)> + '_ {
-        let buildings = self
-            .buildings
-            .iter()
-            .flat_map(|building| building.occluders.iter().copied().map(|b| (b, building.id())));
+        let buildings = self.buildings.iter().flat_map(|building| {
+            building
+                .occluders
+                .iter()
+                .copied()
+                .map(|b| (b, building.id()))
+        });
         let props = self
             .props
             .iter()
-            .filter_map(|prop| prop.occluder_bounds().map(|b| (b, prop.id)));
+            .filter_map(|prop| prop.occluder_bounds().map(|b| (b, prop.id())));
         buildings.chain(props)
     }
 
@@ -280,7 +285,7 @@ impl Chunk {
             + self.slopes.capacity() * size_of::<f32>()
             + self.colliders.capacity() * size_of::<(Aabb, u64)>()
             + self.props.capacity() * size_of::<PropInstance>()
-            + self.buildings.capacity() * size_of::<BuildingInstance>()
+            + self.buildings.capacity() * size_of::<TownBuilding>()
             + self.roads.capacity() * size_of::<crate::road::RoadSegment>();
         let strings: usize = self
             .props
@@ -355,7 +360,10 @@ impl PropKind {
     /// True when the prop contributes a collider.
     #[must_use]
     pub fn is_solid(self) -> bool {
-        matches!(self, Self::Tree | Self::Rock | Self::Bush | Self::Post | Self::Other)
+        matches!(
+            self,
+            Self::Tree | Self::Rock | Self::Bush | Self::Post | Self::Other
+        )
     }
 
     /// True when the prop hides whatever is behind it.
@@ -485,11 +493,7 @@ impl PropInstance {
         let half = half * self.scale;
         let base = self.position.y + base * self.scale;
         Some(Aabb::new(
-            Vec3::new(
-                self.position.x - half,
-                base,
-                self.position.z - half,
-            ),
+            Vec3::new(self.position.x - half, base, self.position.z - half),
             Vec3::new(
                 self.position.x + half,
                 base + height * self.scale,
@@ -568,7 +572,10 @@ mod tests {
     #[test]
     fn tiles_reports_the_side_length() {
         assert_eq!(chunk().tiles(), 4);
-        assert_eq!(Chunk::empty(ChunkPos::ZERO, 32, 1.0, BiomeId::PLAINS).tiles(), 32);
+        assert_eq!(
+            Chunk::empty(ChunkPos::ZERO, 32, 1.0, BiomeId::PLAINS).tiles(),
+            32
+        );
     }
 
     #[test]
@@ -608,7 +615,10 @@ mod tests {
     fn tile_lookup_matches_the_set() {
         let c = chunk();
         let set = set();
-        assert_eq!(c.tile_def(0, 0, &set).map(|t| t.name.as_str()), Some("grass"));
+        assert_eq!(
+            c.tile_def(0, 0, &set).map(|t| t.name.as_str()),
+            Some("grass")
+        );
         assert!(c.is_walkable(0, 0, &set));
         assert!(!c.blocks_sight(0, 0, &set));
         // Tile 0 is "void": solid and sight-blocking.
@@ -717,7 +727,10 @@ mod tests {
         assert!(solid.max.y - solid.min.y > 1.0);
         let occ = tree.occluder_bounds().unwrap();
         assert!(occ.min.y > solid.min.y, "canopy sits above the trunk");
-        assert!(occ.size().x > solid.size().x, "canopy is wider than the trunk");
+        assert!(
+            occ.size().x > solid.size().x,
+            "canopy is wider than the trunk"
+        );
     }
 
     #[test]
@@ -751,19 +764,26 @@ mod tests {
 
     #[test]
     fn occluder_boxes_merge_buildings_and_props() {
-        use crate::town::{BuildingInstance, Facing};
+        use crate::town::Facing;
         let mut c = chunk();
-        c.props.push(PropInstance::new("tree", Vec3::new(4.5, 0.0, -7.5), 0.0, 1.0));
-        c.props.push(PropInstance::new("rock", Vec3::new(5.5, 0.0, -7.5), 0.0, 1.0));
-        c.buildings.push(BuildingInstance {
+        c.props.push(PropInstance::new(
+            "tree",
+            Vec3::new(4.5, 0.0, -7.5),
+            0.0,
+            1.0,
+        ));
+        c.props.push(PropInstance::new(
+            "rock",
+            Vec3::new(5.5, 0.0, -7.5),
+            0.0,
+            1.0,
+        ));
+        c.buildings.push(TownBuilding {
             prefab: "house".into(),
             origin: Vec3::new(6.0, 0.0, -7.0),
             yaw: 0.0,
             size_tiles: (2, 2),
-            bounds: Aabb::new(
-                Vec3::new(6.0, 0.0, -7.0),
-                Vec3::new(8.0, 3.0, -5.0),
-            ),
+            bounds: Aabb::new(Vec3::new(6.0, 0.0, -7.0), Vec3::new(8.0, 3.0, -5.0)),
             facing: Facing::South,
             occluders: vec![Aabb::new(
                 Vec3::new(6.0, 0.0, -7.0),

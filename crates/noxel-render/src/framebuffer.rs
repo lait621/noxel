@@ -53,6 +53,17 @@ pub struct Framebuffer {
     ids: Vec<u32>,
 }
 
+impl Default for Framebuffer {
+    /// A 1x1 black frame.
+    ///
+    /// Exists so a caller can `mem::take` a framebuffer out of a struct it is
+    /// also borrowing — the render target is moved out, handed over, and moved
+    /// back in.
+    fn default() -> Self {
+        Self::new(1, 1)
+    }
+}
+
 impl Framebuffer {
     /// The id written where nothing has been drawn.
     pub const NO_ID: u32 = u32::MAX;

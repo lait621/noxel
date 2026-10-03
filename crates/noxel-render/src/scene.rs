@@ -364,6 +364,54 @@ impl Scene {
     /// Prefer this over mutating [`Instance::transform`] directly: it is the
     /// only way the cached bounds stay correct, and a stale AABB makes the
     /// visibility system cull something it should not.
+    /// Replaces an instance's flags. Returns false when the handle is stale.
+    pub fn set_flags(&mut self, handle: InstanceHandle, flags: InstanceFlags) -> bool {
+        match self.instances.get_mut(handle) {
+            Some(instance) => {
+                instance.flags = flags;
+                self.touch();
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Removes a mesh and returns whether it was there.
+    ///
+    /// Instances referencing it keep a stale handle and are skipped when drawn,
+    /// which is what makes a streaming system's teardown order irrelevant.
+    pub fn remove_mesh(&mut self, handle: MeshHandle) -> bool {
+        let removed = self.meshes.remove(handle).is_some();
+        if removed {
+            self.touch();
+        }
+        removed
+    }
+
+    /// Removes a material.
+    pub fn remove_material(&mut self, handle: MaterialHandle) -> bool {
+        let removed = self.materials.remove(handle).is_some();
+        if removed {
+            self.touch();
+        }
+        removed
+    }
+
+    /// Removes a texture.
+    pub fn remove_texture(&mut self, handle: TextureHandle) -> bool {
+        let removed = self.textures.remove(handle).is_some();
+        if removed {
+            self.touch();
+        }
+        removed
+    }
+
+    /// Moves and rotates an instance, refreshing its cached world bounds.
+    ///
+    /// Returns false when the handle is stale. Refreshing the bounds here (rather
+    /// than leaving it to the caller) is what keeps culling correct for anything
+    /// that moves — a culler reading stale bounds will happily draw an object
+    /// that has gone off-screen, or cull one that has come back.
     pub fn set_transform(&mut self, handle: InstanceHandle, transform: Transform) -> bool {
         self.touch();
         let mesh_bounds = match self.instances.get(handle) {

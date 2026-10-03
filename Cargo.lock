@@ -41,6 +41,7 @@ version = "0.1.0"
 name = "noxel-debug"
 version = "0.1.0"
 dependencies = [
+ "noxel-asset",
  "noxel-core",
  "noxel-render",
 ]

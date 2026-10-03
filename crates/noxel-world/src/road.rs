@@ -13,7 +13,7 @@
 //!
 //! ```
 //! use noxel_core::math::{ChunkPos, Vec3};
-//! use noxel_world::gen::WorldConfig;
+//! use noxel_world::WorldConfig;
 //! use noxel_world::road::{RoadNetwork, macro_line_x};
 //!
 //! let config = WorldConfig::new(1);
@@ -25,10 +25,11 @@
 //! assert!(net.is_on_road(Vec3::new(x, 0.0, 16.0), 0.0));
 //! ```
 
-use noxel_core::math::{Aabb, ChunkPos, Vec3, distance_to_segment_2d};
+use noxel_core::math::noise::distance_to_segment_2d;
+use noxel_core::math::{Aabb, ChunkPos, Vec2, Vec3};
 use noxel_core::rng::RngStream;
 
-use crate::gen::WorldConfig;
+use crate::r#gen::WorldConfig;
 
 /// A straight piece of road, in world space.
 ///
@@ -54,7 +55,11 @@ impl RoadSegment {
         Self {
             from,
             to,
-            width: if width.is_finite() { width.max(0.0) } else { 0.0 },
+            width: if width.is_finite() {
+                width.max(0.0)
+            } else {
+                0.0
+            },
             is_main,
         }
     }
@@ -65,7 +70,7 @@ impl RoadSegment {
     /// the endpoints is a grade, not extra length.
     #[must_use]
     pub fn length(&self) -> f32 {
-        self.to.truncate().distance(self.from.truncate())
+        xz(self.to).distance(xz(self.from))
     }
 
     /// Half the paved width.
@@ -93,9 +98,9 @@ impl RoadSegment {
     /// caller can place something on the road surface directly.
     #[must_use]
     pub fn closest_point(&self, p: Vec3) -> Vec3 {
-        let a = self.from.truncate();
-        let b = self.to.truncate();
-        let q = p.truncate();
+        let a = xz(self.from);
+        let b = xz(self.to);
+        let q = xz(p);
         let ab = b - a;
         let len_sq = ab.length_squared();
         let t = if len_sq < 1e-9 {
@@ -113,7 +118,7 @@ impl RoadSegment {
     /// XZ distance from `p` to the centre line.
     #[must_use]
     pub fn distance_to(&self, p: Vec3) -> f32 {
-        distance_to_segment_2d(p.truncate(), self.from.truncate(), self.to.truncate())
+        distance_to_segment_2d(xz(p), xz(self.from), xz(self.to))
     }
 
     /// The segment's world bounds, grown by `margin` and by half its width.
@@ -123,7 +128,11 @@ impl RoadSegment {
     /// assumes a positive extent.
     #[must_use]
     pub fn aabb(&self, margin: f32) -> Aabb {
-        let margin = if margin.is_finite() { margin.max(0.0) } else { 0.0 };
+        let margin = if margin.is_finite() {
+            margin.max(0.0)
+        } else {
+            0.0
+        };
         let half = self.half_width();
         let pad = margin + half;
         let y_lo = self.from.y.min(self.to.y) - 1.0;
@@ -136,6 +145,39 @@ impl RoadSegment {
             y_lo,
             y_hi - y_lo,
         )
+    }
+
+    /// The piece of this road that lies inside an XZ box, or `None` when it
+    /// misses entirely.
+    ///
+    /// Used to hand each chunk the part of a road that crosses it, so the pieces
+    /// tile the network exactly and neighbouring chunks never report the same
+    /// pavement twice. Heights are interpolated along the clipped piece, and the
+    /// width is preserved.
+    #[must_use]
+    pub fn clip_to_aabb(&self, bounds: &Aabb) -> Option<Self> {
+        let (t0, t1) = clip_parameters(
+            self.from.x,
+            self.from.z,
+            self.to.x,
+            self.to.z,
+            bounds.min.x,
+            bounds.min.z,
+            bounds.max.x,
+            bounds.max.z,
+        )?;
+        let from = self.from.lerp(self.to, t0);
+        let to = self.from.lerp(self.to, t1);
+        let clipped = Self {
+            from,
+            to,
+            width: self.width,
+            is_main: self.is_main,
+        };
+        if clipped.length() <= 1e-4 {
+            return None;
+        }
+        Some(clipped)
     }
 }
 
@@ -196,6 +238,73 @@ pub fn nearest_line_index(config: &WorldConfig, coordinate: f32) -> i32 {
     }
     // 4_000_000 * 256 m is still comfortably inside f32's exact-integer range.
     raw.round().clamp(-4_000_000.0, 4_000_000.0) as i32
+}
+
+/// A world vector's XZ components, as a `Vec2` whose `y` is world Z.
+///
+/// `Vec3::truncate` drops Z and keeps XY, which is the wrong plane for a
+/// top-down world; this is the conversion the road maths actually wants.
+#[inline]
+#[must_use]
+fn xz(v: Vec3) -> Vec2 {
+    Vec2::new(v.x, v.z)
+}
+
+/// Liang–Barsky clip of the segment `a`–`b` against an XZ box.
+///
+/// Returns the two parameters along the segment that lie inside the box, or
+/// `None` when the segment misses it. Degenerate boxes are treated as misses
+/// rather than as everything.
+#[must_use]
+fn clip_parameters(
+    ax: f32,
+    az: f32,
+    bx: f32,
+    bz: f32,
+    x0: f32,
+    z0: f32,
+    x1: f32,
+    z1: f32,
+) -> Option<(f32, f32)> {
+    if !(x1 > x0) || !(z1 > z0) {
+        return None;
+    }
+    let dx = bx - ax;
+    let dz = bz - az;
+    if !dx.is_finite() || !dz.is_finite() {
+        return None;
+    }
+    let mut t0 = 0.0f32;
+    let mut t1 = 1.0f32;
+    for (p, q) in [(-dx, ax - x0), (dx, x1 - ax), (-dz, az - z0), (dz, z1 - az)] {
+        if p.abs() < 1e-9 {
+            // Parallel to this edge: inside only if the origin already is.
+            if q < 0.0 {
+                return None;
+            }
+            continue;
+        }
+        let r = q / p;
+        if p < 0.0 {
+            if r > t1 {
+                return None;
+            }
+            if r > t0 {
+                t0 = r;
+            }
+        } else {
+            if r < t0 {
+                return None;
+            }
+            if r < t1 {
+                t1 = r;
+            }
+        }
+    }
+    if t1 < t0 {
+        return None;
+    }
+    Some((t0, t1))
 }
 
 /// A set of road segments, queried by distance and by bounds.
@@ -302,7 +411,11 @@ impl RoadNetwork {
     /// paved half width.
     #[must_use]
     pub fn is_on_road(&self, p: Vec3, extra: f32) -> bool {
-        let extra = if extra.is_finite() { extra.max(0.0) } else { 0.0 };
+        let extra = if extra.is_finite() {
+            extra.max(0.0)
+        } else {
+            0.0
+        };
         self.segments
             .iter()
             .any(|segment| segment.distance_to(p) <= segment.half_width() + extra)
@@ -329,7 +442,8 @@ impl RoadNetwork {
     /// Approximate heap footprint in bytes.
     #[must_use]
     pub fn memory_bytes(&self) -> usize {
-        core::mem::size_of::<Self>() + self.segments.capacity() * core::mem::size_of::<RoadSegment>()
+        core::mem::size_of::<Self>()
+            + self.segments.capacity() * core::mem::size_of::<RoadSegment>()
     }
 
     /// Upper bound on how many segments [`RoadNetwork::generate`] will build.
@@ -358,7 +472,12 @@ mod tests {
 
     #[test]
     fn segment_length_is_xz() {
-        let s = RoadSegment::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(3.0, 100.0, 4.0), 2.0, true);
+        let s = RoadSegment::new(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(3.0, 100.0, 4.0),
+            2.0,
+            true,
+        );
         assert!((s.length() - 5.0).abs() < 1e-4);
         assert_eq!(s.half_width(), 1.0);
     }
@@ -373,7 +492,12 @@ mod tests {
 
     #[test]
     fn closest_point_clamps_to_the_ends() {
-        let s = RoadSegment::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 0.0, 0.0), 2.0, true);
+        let s = RoadSegment::new(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(10.0, 0.0, 0.0),
+            2.0,
+            true,
+        );
         assert!((s.closest_point(Vec3::new(5.0, 3.0, 4.0)).x - 5.0).abs() < 1e-5);
         assert!((s.closest_point(Vec3::new(-5.0, 0.0, 0.0)).x - 0.0).abs() < 1e-5);
         assert!((s.closest_point(Vec3::new(50.0, 0.0, 0.0)).x - 10.0).abs() < 1e-5);
@@ -382,14 +506,24 @@ mod tests {
 
     #[test]
     fn closest_point_interpolates_height() {
-        let s = RoadSegment::new(Vec3::new(0.0, 2.0, 0.0), Vec3::new(10.0, 6.0, 0.0), 2.0, true);
+        let s = RoadSegment::new(
+            Vec3::new(0.0, 2.0, 0.0),
+            Vec3::new(10.0, 6.0, 0.0),
+            2.0,
+            true,
+        );
         let mid = s.closest_point(Vec3::new(5.0, 0.0, 0.0));
         assert!((mid.y - 4.0).abs() < 1e-4, "{mid:?}");
     }
 
     #[test]
     fn aabb_covers_the_width_and_the_endpoints() {
-        let s = RoadSegment::new(Vec3::new(0.0, 1.0, 0.0), Vec3::new(10.0, 3.0, 0.0), 4.0, true);
+        let s = RoadSegment::new(
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(10.0, 3.0, 0.0),
+            4.0,
+            true,
+        );
         let b = s.aabb(0.5);
         assert!(b.contains_point(Vec3::new(0.0, 1.0, 0.0)));
         assert!(b.contains_point(Vec3::new(10.0, 3.0, 0.0)));
@@ -457,7 +591,7 @@ mod tests {
             net.is_on_road(Vec3::new(vx, 0.0, hz), 0.0),
             "the junction must be on both roads"
         );
-        assert_eq!(net.distance_to_nearest(Vec3::new(vx, 0.0, hz)), 0.0);
+        assert!(net.distance_to_nearest(Vec3::new(vx, 0.0, hz)) < 1e-3);
     }
 
     #[test]
@@ -480,10 +614,12 @@ mod tests {
     fn distant_points_are_not_on_a_road() {
         let c = config();
         let net = RoadNetwork::generate(&c, ChunkPos::new(0, 0), ChunkPos::new(3, 3));
-        // Midway between two lattice lines, 128 m from each.
-        let x = macro_line_x(&c, 0) + 128.0;
-        assert!(!net.is_on_road(Vec3::new(x, 0.0, 0.0), 0.0));
-        assert!(net.distance_to_nearest(Vec3::new(x, 0.0, 0.0)) > 100.0);
+        // Midway between four lattice lines, 128 m from each.
+        let spacing = macro_spacing(&c);
+        let x = macro_line_x(&c, 0) + spacing * 0.5;
+        let z = macro_line_z(&c, 0) + spacing * 0.5;
+        assert!(!net.is_on_road(Vec3::new(x, 0.0, z), 0.0));
+        assert!(net.distance_to_nearest(Vec3::new(x, 0.0, z)) > 100.0);
     }
 
     #[test]
@@ -522,7 +658,11 @@ mod tests {
     #[test]
     fn region_is_capped() {
         let c = config();
-        let net = RoadNetwork::generate(&c, ChunkPos::new(-100_000, -100_000), ChunkPos::new(100_000, 100_000));
+        let net = RoadNetwork::generate(
+            &c,
+            ChunkPos::new(-100_000, -100_000),
+            ChunkPos::new(100_000, 100_000),
+        );
         assert!(net.len() <= RoadNetwork::MAX_SEGMENTS);
     }
 

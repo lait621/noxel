@@ -486,6 +486,45 @@ impl Default for TileFlags {
 }
 
 impl TileFlags {
+    /// A tile an actor can stand on.
+    #[must_use]
+    pub const fn walkable() -> Self {
+        Self {
+            walkable: true,
+            blocks_sight: false,
+            occluder: false,
+            water: false,
+            road: false,
+            buildable: true,
+        }
+    }
+
+    /// A tile that blocks both movement and sight, such as a wall.
+    #[must_use]
+    pub const fn solid() -> Self {
+        Self {
+            walkable: false,
+            blocks_sight: true,
+            occluder: true,
+            water: false,
+            road: false,
+            buildable: false,
+        }
+    }
+
+    /// A tile with no flags at all set.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            walkable: false,
+            blocks_sight: false,
+            occluder: false,
+            water: false,
+            road: false,
+            buildable: false,
+        }
+    }
+
     /// Reads the flags from a JSON object. Absent fields keep their default,
     /// and `null` means "all defaults".
     pub fn from_json(v: &JsonValue, path: &str) -> Result<Self, FormatError> {
@@ -624,6 +663,22 @@ pub struct TileSet {
     pub tile_size: u32,
     /// The tiles.
     pub tiles: Vec<TileDef>,
+}
+
+impl Default for TileSet {
+    /// An empty tile set, used when no asset tree is present.
+    ///
+    /// The world generator treats a missing tile as "fall back to the biome's
+    /// base tile", so an empty set yields a plain but valid world rather than a
+    /// failure.
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            texture: String::new(),
+            tile_size: 16,
+            tiles: Vec::new(),
+        }
+    }
 }
 
 impl TileSet {

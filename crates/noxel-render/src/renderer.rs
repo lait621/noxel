@@ -51,6 +51,24 @@ pub struct CameraView {
     pub world_units_per_pixel: f32,
 }
 
+impl Default for CameraView {
+    /// A camera at the origin looking along `-Z` with a unit view volume.
+    ///
+    /// An app needs *a* view before the first frame is simulated; this is a
+    /// valid one rather than a zeroed matrix that would blank the screen.
+    fn default() -> Self {
+        Self::orthographic(
+            Vec3::ZERO,
+            Vec3::new(0.0, 0.0, -1.0),
+            Vec3::Y,
+            1.0,
+            1.0,
+            0.1,
+            100.0,
+        )
+    }
+}
+
 impl CameraView {
     /// Builds a view from an explicit matrix pair.
     ///
@@ -407,6 +425,25 @@ impl Default for RenderSettings {
 }
 
 impl RenderSettings {
+    /// The resolve settings that pair with these render settings.
+    ///
+    /// The tone curve is chosen from the mode: a fully ray-traced frame carries
+    /// HDR values (an emissive can exceed 1.0) and needs a curve, while the
+    /// raster mode is authored to land directly in `[0, 1]` so an unlit sprite
+    /// round-trips to the exact bytes the artist drew.
+    #[must_use]
+    pub fn resolve(&self) -> crate::framebuffer::ResolveSettings {
+        crate::framebuffer::ResolveSettings {
+            exposure: self.exposure,
+            tonemap: if self.mode == ShadingMode::Raytrace {
+                crate::framebuffer::ToneMap::Aces
+            } else {
+                crate::framebuffer::ToneMap::None
+            },
+            ..crate::framebuffer::ResolveSettings::default()
+        }
+    }
+
     /// A preset that favours speed on a large world.
     #[must_use]
     pub fn fast() -> Self {
